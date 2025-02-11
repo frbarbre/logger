@@ -2,9 +2,8 @@ services:
   node-app:
     build: ./backend
     ports:
-      - "3000:3000"
+      - "8000:8000"
     volumes:
-      - ./backend/container_stats.sql:/usr/src/app/container_stats.sql
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - POCKETBASE_URL=http://pocketbase:8090
@@ -44,6 +43,19 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
+
+  next-app:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    networks:
+      - app-network
+    environment:
+      - NEXT_PUBLIC_POCKETBASE_URL=http://pocketbase:8090
+      - NEXT_PUBLIC_API_URL=http://node-app:8000
+    depends_on:
+      pocketbase:
+        condition: service_healthy
 
 networks:
   app-network:

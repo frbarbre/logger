@@ -1,9 +1,8 @@
 import { exec } from "child_process";
-import superuserClient from "./pocketbase.js";
 import express from "express";
 import http from "http";
+import superuserClient from "./pocketbase.js";
 import { formatDockerStats } from "./utils.js";
-
 const app = express();
 const server = http.createServer(app);
 
