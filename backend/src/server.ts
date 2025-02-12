@@ -2,7 +2,7 @@ import { exec } from "child_process";
 import express from "express";
 import http from "http";
 import superuserClient from "./pocketbase.js";
-import { formatDockerStats } from "./utils.js";
+import { checkValidNumber, formatDockerStats } from "./utils.js";
 const app = express();
 const server = http.createServer(app);
 
@@ -61,8 +61,10 @@ server.listen(PORT, async () => {
   // Test connection and authenticate
   const isConnected = await testPocketBaseConnection();
 
+  const interval = checkValidNumber(process.env.INTERVAL || "5000");
+
   if (isConnected) {
-    setInterval(collectDockerStats, 5000);
+    setInterval(collectDockerStats, interval);
   } else {
     console.error(
       "Stats collection disabled due to PocketBase connection failure"
