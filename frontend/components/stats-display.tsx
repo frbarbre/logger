@@ -1,14 +1,15 @@
 "use client";
 
-import { containerStatsQuery } from "@/lib/queries";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
-import PocketBase from "pocketbase";
+import { containerStatsQuery } from "@/lib/queries";
+import client from "@/utils/pb.client";
+import { Session } from "@/types";
 
-const pb = new PocketBase(process.env.NEXT_PUBLIC_POCKETBASE_URL);
+export default function StatsDisplay({ session }: { session: Session }) {
+  const pb = client(session);
 
-export default function StatsDisplay() {
-  const { data = [], refetch } = useQuery(containerStatsQuery);
+  const { data = [], refetch } = useQuery(containerStatsQuery(pb));
 
   useEffect(() => {
     // Subscribe to realtime updates

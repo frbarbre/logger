@@ -3,12 +3,15 @@ import express from "express";
 import http from "http";
 import superuserClient from "./pocketbase.js";
 import { checkValidNumber, formatDockerStats } from "./utils.js";
+import cors from "cors";
+
 const app = express();
 const server = http.createServer(app);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8000;
 
 app.use(express.json());
+app.use(cors());
 
 const collectDockerStats = () => {
   exec(

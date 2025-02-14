@@ -1,8 +1,10 @@
 import PocketBase from "pocketbase";
 
-const pb = new PocketBase(process.env.NEXT_PUBLIC_POCKETBASE_URL);
+export async function getContainerStats(pb: PocketBase) {
+  if (!pb.authStore.isSuperuser) {
+    return null;
+  }
 
-export async function getContainerStats() {
   const records = await pb.collection("container_stats").getList(1, 10, {
     sort: "-timestamp",
   });
@@ -11,7 +13,7 @@ export async function getContainerStats() {
   );
 }
 
-export const containerStatsQuery = {
+export const containerStatsQuery = (pb: PocketBase) => ({
   queryKey: ["container-stats"],
-  queryFn: getContainerStats,
-};
+  queryFn: () => getContainerStats(pb),
+});

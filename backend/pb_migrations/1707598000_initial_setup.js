@@ -14,12 +14,9 @@ migrate(
       name: "container_stats",
       type: "base",
       system: false,
-      listRule: "",
-      viewRule: "",
-      createRule: "",
-      updateRule: "",
-      deleteRule: "",
-      options: {},
+      options: {
+        manageRule: "locked",
+      },
       indexes: [],
       fields: [
         {
