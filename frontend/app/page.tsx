@@ -13,7 +13,9 @@ export default async function Home() {
 
   const session = await getSession();
 
-  if (!session) return null;
+  if (!session) {
+    redirect("/login");
+  }
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
