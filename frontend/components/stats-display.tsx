@@ -2,14 +2,23 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { containerStatsQuery } from "@/lib/queries";
+import {
+  containerStatsBetweenDatesQuery,
+  containerStatsQuery,
+} from "@/lib/queries";
 import client from "@/utils/pb.client";
 import { Session } from "@/types";
 
 export default function StatsDisplay({ session }: { session: Session }) {
   const pb = client(session);
 
-  const { data = [], refetch } = useQuery(containerStatsQuery(pb));
+  const { data = [], refetch } = useQuery(
+    containerStatsBetweenDatesQuery(
+      pb,
+      new Date("2025-02-13T17:00:05Z"),
+      new Date("2025-02-13T17:30:31Z")
+    )
+  );
 
   useEffect(() => {
     // Subscribe to realtime updates

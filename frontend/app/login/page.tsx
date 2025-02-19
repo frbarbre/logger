@@ -1,4 +1,5 @@
 import { login, getSession } from "@/lib/auth";
+import client from "@/utils/pb.server";
 import { redirect } from "next/navigation";
 export default async function Page() {
   const session = await getSession();
@@ -15,7 +16,17 @@ export default async function Page() {
           "use server";
           const email = formData.get("email") as string;
           const password = formData.get("password") as string;
-          await login(email, password);
+
+          const pb = await client();
+
+          try {
+            const auth = await pb
+              .collection("_superusers")
+              .authWithPassword(email, password);
+            await login(auth);
+          } catch (error) {
+            console.error(error);
+          }
         }}
       >
         <label>

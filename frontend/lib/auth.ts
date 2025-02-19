@@ -22,18 +22,10 @@ export async function decrypt(input: string): Promise<any> {
   return payload;
 }
 
-export async function login(email: string, password: string) {
-  // Verify credentials && get the user
-
-  const pb = await client();
-
-  const auth = await pb
-    .collection("_superusers")
-    .authWithPassword(email, password);
-
+export async function login(user: any) {
   // Create the session
   const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-  const session = await encrypt({ user: auth, expires });
+  const session = await encrypt({ user, expires });
 
   // Save the session in a cookie
   const cookieStore = await cookies();

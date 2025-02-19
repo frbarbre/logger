@@ -1,3 +1,5 @@
+import { Stats } from "types/index.js";
+
 export function formatDockerStats(stats: {
   Name: string;
   CPUPerc: string;
@@ -6,7 +8,7 @@ export function formatDockerStats(stats: {
   NetIO: string;
   BlockIO: string;
   PIDS: string;
-}) {
+}): Stats {
   // Helper function to convert sizes to MB
   const convertToMB = (value: string): number => {
     const num = parseFloat(value);

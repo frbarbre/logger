@@ -7,8 +7,9 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - POCKETBASE_URL=http://pocketbase:8090
-      - POCKETBASE_ADMIN_EMAIL=fr.barbre@gmail.com
-      - POCKETBASE_ADMIN_PASSWORD=Cecilieharbo69
+      - POCKETBASE_ADMIN_EMAIL=${POCKETBASE_ADMIN_EMAIL}
+      - POCKETBASE_ADMIN_PASSWORD=${POCKETBASE_ADMIN_PASSWORD}
+      - INTERVAL=${INTERVAL}
     networks:
       - app-network
     depends_on:
@@ -27,8 +28,8 @@ services:
     networks:
       - app-network
     environment:
-      - POCKETBASE_ADMIN_EMAIL=fr.barbre@gmail.com
-      - POCKETBASE_ADMIN_PASSWORD=Cecilieharbo69
+      - POCKETBASE_ADMIN_EMAIL=${POCKETBASE_ADMIN_EMAIL}
+      - POCKETBASE_ADMIN_PASSWORD=${POCKETBASE_ADMIN_PASSWORD}
     healthcheck:
       test:
         [

@@ -7,6 +7,7 @@ async function client() {
   if (session) {
     pb.authStore.save(session.user.token, session.user.record);
   }
+
   return pb;
 }
 
