@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SelectRangeEventHandler } from "react-day-picker";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -212,7 +213,7 @@ export function DateTimeRangePicker({
             mode="range"
             defaultMonth={dateRange.from}
             selected={dateRange}
-            onSelect={handleDateRangeChange}
+            onSelect={handleDateRangeChange as SelectRangeEventHandler}
             numberOfMonths={2}
             disabled={isDateInPast}
           />
