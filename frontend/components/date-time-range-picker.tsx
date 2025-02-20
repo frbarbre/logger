@@ -27,8 +27,13 @@ import { SelectRangeEventHandler } from "react-day-picker";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+interface DateTimeRange {
+  start: string;
+  end: string | "now";
+}
+
 interface DateTimeRangePickerProps {
-  onRangeSelect: (range: string) => void;
+  onRangeSelect: (range: DateTimeRange) => void;
   use24HourTime?: boolean;
 }
 
@@ -46,9 +51,9 @@ export function DateTimeRangePicker({
   const [startTime, setStartTime] = React.useState<string>("00:00");
   const [endTime, setEndTime] = React.useState<string>("00:15");
 
-  const handleDateRangeChange = (
+  function handleDateRangeChange(
     range: { from: Date | undefined; to: Date | undefined } | undefined
-  ) => {
+  ) {
     if (!range) {
       setDateRange({ from: undefined, to: undefined });
       setStartTime("00:00");
@@ -64,10 +69,12 @@ export function DateTimeRangePicker({
     }
     setStartTime("00:00");
     setEndTime("00:15");
-  };
+  }
 
-  const formatOutput = () => {
-    if (!dateRange.from || !dateRange.to) return "Please select a date range";
+  function formatOutput(): DateTimeRange {
+    if (!dateRange.from || !dateRange.to) {
+      return { start: "", end: "" };
+    }
 
     const startDateTime = dayjs(dateRange.from)
       .set("hour", Number.parseInt(startTime.split(":")[0]))
@@ -85,14 +92,14 @@ export function DateTimeRangePicker({
             .utc()
             .format("YYYY-MM-DDTHH:mm:ssZ");
 
-    return `Start: ${utcStart}\nEnd: ${utcEnd}`;
-  };
+    return { start: utcStart, end: utcEnd };
+  }
 
-  const isDateInPast = (date: Date) => {
+  function isDateInPast(date: Date) {
     return date > new Date();
-  };
+  }
 
-  const getAvailableTimes = (isStart: boolean) => {
+  function getAvailableTimes(isStart: boolean) {
     const times: string[] = [];
     const now = new Date();
     const selectedDate = isStart ? dateRange.from : dateRange.to;
@@ -144,9 +151,9 @@ export function DateTimeRangePicker({
     }
 
     return times;
-  };
+  }
 
-  const handleStartTimeChange = (newTime: string) => {
+  function handleStartTimeChange(newTime: string) {
     setStartTime(newTime);
     const availableEndTimes = getAvailableTimes(false);
     if (availableEndTimes.length > 0) {
@@ -159,18 +166,18 @@ export function DateTimeRangePicker({
     } else if (isToday(dateRange.to!)) {
       setEndTime("now");
     }
-  };
+  }
 
-  const handleEndTimeChange = (newTime: string) => {
+  function handleEndTimeChange(newTime: string) {
     setEndTime(newTime);
-  };
+  }
 
-  const handleApply = () => {
+  function handleApply() {
     const formattedRange = formatOutput();
     onRangeSelect(formattedRange);
-  };
+  }
 
-  const formatTimeForDisplay = (time: string) => {
+  function formatTimeForDisplay(time: string) {
     if (time === "now") return "Now";
     if (use24HourTime) return time;
 
@@ -178,7 +185,7 @@ export function DateTimeRangePicker({
     const period = hours >= 12 ? "PM" : "AM";
     const displayHours = hours % 12 || 12;
     return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`;
-  };
+  }
 
   return (
     <div className="grid gap-4">

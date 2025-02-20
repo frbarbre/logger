@@ -16,11 +16,13 @@
     "@radix-ui/react-slot": "^1.1.2",
     "@tanstack/react-query": "^5.66.0",
     "@tanstack/react-query-devtools": "^5.66.0",
+    "@types/lodash": "^4.17.15",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.13",
     "jose": "^5.9.6",
+    "lodash": "^4.17.21",
     "lucide-react": "^0.475.0",
     "next": "15.1.7",
     "pocketbase": "^0.25.1",
@@ -28,7 +30,9 @@
     "react-day-picker": "8.10.1",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^3.0.1",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "use-sync-external-store": "^1.4.0",
+    "zustand": "^5.0.3"
   },
   "devDependencies": {
     "@tanstack/eslint-plugin-query": "^5.66.1",

@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import { ChevronDown } from "lucide-react";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -20,6 +19,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DateTimeRangePicker } from "@/components/date-time-range-picker";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useDateRangeStore } from "@/store";
+import useStore from "@/hooks/use-store";
 
 dayjs.extend(utc);
 dayjs.extend(relativeTime);
@@ -38,44 +41,53 @@ interface TimeRangeSelectorProps {
   use24HourTime?: boolean;
 }
 
+interface DateTimeRange {
+  start: string;
+  end: string | "now";
+}
+
 export function TimeRangeSelector({
   use24HourTime = true,
 }: TimeRangeSelectorProps) {
-  const [selectedRange, setSelectedRange] = React.useState<string>("24h");
-  const [customRange, setCustomRange] = React.useState<string | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const changeDateRange = useDateRangeStore((state) => state.changeDateRanges);
 
-  const handleRangeSelect = (range: string) => {
+  const dateRange = useStore(useDateRangeStore, (state) => state.dateRanges);
+  const router = useRouter();
+
+  function handleRangeSelect(range: string) {
     if (range === "custom") {
       setIsDialogOpen(true);
     } else {
-      setSelectedRange(range);
-      setCustomRange(null);
+      changeDateRange({ start: range, end: "now" });
     }
-  };
+  }
 
-  const handleCustomRangeSelect = (range: string) => {
-    setCustomRange(range);
-    setSelectedRange("custom");
+  function handleCustomRangeSelect(range: DateTimeRange) {
     setIsDialogOpen(false);
-  };
 
-  const formatSelectedRange = () => {
-    if (customRange) {
-      return customRange;
+    changeDateRange({ start: range.start, end: range.end });
+  }
+
+  useEffect(() => {
+    if (!dateRange) {
+      router.push(`?start=24h&end=now`);
+    } else {
+      router.push(
+        `?start=${encodeURIComponent(dateRange.start)}&end=${encodeURIComponent(
+          dateRange.end
+        )}`
+      );
     }
-
-    return `Start: ${selectedRange}\nEnd: now`;
-  };
+  }, [dateRange]);
 
   return (
     <div className="flex flex-col space-y-2">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" className="w-[200px] justify-between">
-            {selectedRange === "custom"
-              ? "Custom Range"
-              : predefinedRanges.find((r) => r.value === selectedRange)?.label}
+            {predefinedRanges.find((r) => r.value === dateRange?.start)
+              ?.label || "Custom Range"}
             <ChevronDown className="ml-2 h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
@@ -108,9 +120,7 @@ export function TimeRangeSelector({
 
       <div className="mt-4">
         <h3 className="font-semibold mb-2">Selected Range:</h3>
-        <pre className="bg-muted p-2 rounded whitespace-pre-wrap">
-          {formatSelectedRange()}
-        </pre>
+        <pre className="bg-muted p-2 rounded whitespace-pre-wrap"></pre>
       </div>
     </div>
   );
