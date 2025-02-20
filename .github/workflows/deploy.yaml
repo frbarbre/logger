@@ -1,0 +1,71 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: SSH and Run Update Script
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          command_timeout: 1200s
+          script: |
+            # Define application directory and repository URL
+            REPO_URL="https://github.com/frbarbre/logger.git"
+            APP_DIR=~/logger/myapp
+
+            # Pull latest changes from the Git repository
+            if [ -d "$APP_DIR" ]; then
+              echo "Directory $APP_DIR exists. Resetting remote repository..."
+              cd $APP_DIR
+
+              # Save untracked files (like .env)
+              git stash --include-untracked
+
+              # Reset the Git remote URL to prevent using cached data
+              git remote set-url origin $REPO_URL
+              git fetch origin main
+              git reset --hard origin/main
+
+              # Restore untracked files
+              git stash pop || true  # '|| true' ensures script continues even if stash is empty
+            else
+              echo "Directory $APP_DIR does not exist. Cloning repository..."
+              git clone $REPO_URL $APP_DIR
+              cd $APP_DIR
+            fi
+
+            # Rebuild Docker images without using cache
+            echo "Building Docker containers without cache..."
+            sudo docker-compose build --no-cache
+
+            # Restart Docker containers
+            echo "Restarting Docker containers..."
+            sudo docker-compose down
+            sudo docker-compose up -d
+
+            # Clean up unused Docker images and builders
+            echo "Pruning unused Docker images and builders..."
+            sudo docker image prune -f
+            sudo docker builder prune -a -f
+
+            # Check Docker disk usage
+            echo "Checking Docker disk usage..."
+            sudo docker system df
+
+            # Output success message
+            echo "Update complete. Your app has been deployed with the latest changes."

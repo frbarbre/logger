@@ -1,2 +1,4 @@
 .env
 .env.*
+deploy.sh
+update.sh

@@ -1,8 +1,8 @@
 services:
-  node-app:
+  node-logger-app:
     build: ./backend
     ports:
-      - "8000:8000"
+      - "6666:8000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
@@ -38,17 +38,17 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://localhost:8090/api/health",
+          "${POCKETBASE_URL}/api/health",
         ]
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 5s
 
-  next-app:
+  next-logger-app:
     build: ./frontend
     ports:
-      - "3000:3000"
+      - "5555:3000"
     networks:
       - app-network
     environment:
