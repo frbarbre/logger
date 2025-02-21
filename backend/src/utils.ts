@@ -59,3 +59,8 @@ export function checkValidNumber(value: string) {
 
   return number;
 }
+
+export const average = (numbers: number[]): number => {
+  if (numbers.length === 0) return 0;
+  return numbers.reduce((acc, val) => acc + val, 0) / numbers.length;
+};

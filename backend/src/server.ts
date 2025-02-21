@@ -2,9 +2,11 @@ import { exec } from "child_process";
 import express from "express";
 import http from "http";
 import superuserClient from "./pocketbase.js";
-import { checkValidNumber, formatDockerStats } from "./utils.js";
+import { checkValidNumber, formatDockerStats, average } from "./utils.js";
 import cors from "cors";
 import { Stats } from "types/index.js";
+import lodash from "lodash";
+const { groupBy } = lodash;
 
 const app = express();
 const server = http.createServer(app);
@@ -13,6 +15,64 @@ const PORT = process.env.PORT || 8000;
 
 app.use(express.json());
 app.use(cors());
+
+const aggregateAndSaveStats = async (stats: Stats[]) => {
+  const now = new Date();
+  const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+  const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+  // Save current stats at full resolution
+  for (const stat of stats) {
+    await superuserClient.collection("container_stats").create(stat);
+  }
+
+  // Aggregate older data
+  const oldRecords = await superuserClient
+    .collection("container_stats")
+    .getList(1, 1000, {
+      filter: `timestamp < '${hourAgo.toISOString()}'`,
+      sort: "-timestamp",
+    });
+
+  if (oldRecords.items.length > 0) {
+    // Group by container and 5-minute intervals for data older than 1 hour
+    const groupedStats = groupBy(oldRecords.items, (record) => {
+      const timestamp = new Date(record.timestamp);
+      const interval = timestamp > dayAgo ? 60000 : 300000; // 1 min or 5 min
+      const roundedTime = Math.floor(timestamp.getTime() / interval) * interval;
+      return `${record.name}_${roundedTime}`;
+    });
+
+    // Calculate averages and save aggregated data
+    for (const [_, records] of Object.entries(groupedStats)) {
+      if (records.length <= 1) continue;
+
+      const avgStats = {
+        name: records[0].name,
+        cpu_percent: average(records.map((r) => r.cpu_percent)),
+        memory_usage: average(records.map((r) => r.memory_usage)),
+        memory_limit: records[0].memory_limit,
+        memory_percent: average(records.map((r) => r.memory_percent)),
+        net_io_in: average(records.map((r) => r.net_io_in)),
+        net_io_out: average(records.map((r) => r.net_io_out)),
+        block_io_in: average(records.map((r) => r.block_io_in)),
+        block_io_out: average(records.map((r) => r.block_io_out)),
+        pids: Math.round(average(records.map((r) => r.pids))),
+        timestamp: new Date(
+          Math.max(...records.map((r) => new Date(r.timestamp).getTime()))
+        ).toISOString(),
+      };
+
+      // Delete old records and save aggregated record
+      for (const record of records.slice(1)) {
+        await superuserClient.collection("container_stats").delete(record.id);
+      }
+      await superuserClient
+        .collection("container_stats")
+        .update(records[0].id, avgStats);
+    }
+  }
+};
 
 const collectDockerStats = (prevStats: Stats[]): Promise<Stats[]> => {
   return new Promise((resolve) => {
@@ -29,41 +89,14 @@ const collectDockerStats = (prevStats: Stats[]): Promise<Stats[]> => {
           resolve([]);
           return;
         }
-
         const stats = stdout
           .trim()
           .split("\n")
-          .map((line) => JSON.parse(line));
+          .map((line) => JSON.parse(line))
+          .map((stat) => formatDockerStats(stat));
 
-        try {
-          const formattedStats = stats.map((stat) => formatDockerStats(stat));
-
-          for (const stat of formattedStats) {
-            await superuserClient.collection("container_stats").create(stat);
-          }
-
-          if (prevStats.length > formattedStats.length) {
-            const deletedStats = prevStats
-              .map((stat) => stat.name)
-              .filter(
-                (name) =>
-                  !formattedStats.map((stat) => stat.name).includes(name)
-              );
-            console.log("Deleted stats:", deletedStats);
-          }
-
-          if (prevStats.length < formattedStats.length) {
-            const newStats = formattedStats
-              .map((stat) => stat.name)
-              .filter((name) => !prevStats.map((s) => s.name).includes(name));
-            console.log("New stats:", newStats);
-          }
-
-          resolve(formattedStats);
-        } catch (error) {
-          console.error("Error saving to PocketBase:", error);
-          resolve([]);
-        }
+        await aggregateAndSaveStats(stats);
+        resolve(stats);
       }
     );
   });

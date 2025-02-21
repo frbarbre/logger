@@ -17,7 +17,12 @@ migrate(
       options: {
         manageRule: "locked",
       },
-      indexes: [],
+      listRule: "",
+      viewRule: "",
+      createRule: "",
+      updateRule: "",
+      deleteRule: "",
+      indexes: ["CREATE INDEX idx_timestamp ON container_stats (timestamp)"],
       fields: [
         {
           id: "field_name",
@@ -111,5 +116,19 @@ migrate(
     if (collection) {
       db.deleteCollection(collection.id);
     }
+  }
+);
+
+migrate(
+  (db) => {
+    const collection = db.collection("container_stats");
+    collection.createIndex("timestamp_idx", {
+      field: "timestamp",
+      type: "index",
+    });
+  },
+  (db) => {
+    const collection = db.collection("container_stats");
+    collection.deleteIndex("timestamp_idx");
   }
 );

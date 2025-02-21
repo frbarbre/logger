@@ -13,6 +13,7 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.21.2",
+    "lodash": "^4.17.21",
     "pocketbase": "^0.25.1",
     "typescript": "^5.2.2",
     "ws": "^8.12.0"
@@ -20,6 +21,7 @@
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
+    "@types/lodash": "^4.17.15",
     "@types/node": "^22.10.10",
     "@types/ws": "^8.5.5",
     "ts-node": "^10.9.2",
