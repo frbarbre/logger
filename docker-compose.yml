@@ -55,6 +55,7 @@ services:
       - NEXT_PUBLIC_POCKETBASE_URL=http://pocketbase:8090
       - NEXT_PUBLIC_API_URL=http://node-app:8000
       - SESSION_SECRET=${SESSION_SECRET}
+      - POCKETBASE_URL=http://pocketbase:8090
     depends_on:
       pocketbase:
         condition: service_healthy
