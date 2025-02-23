@@ -142,14 +142,14 @@ export default function StatsDisplay({ session }: { session: Session }) {
 
   const intervalSeconds = calculateOptimalInterval(startTime, endTime);
 
-  const aggregatedData = data
-    ? aggregateData(
-        data,
-        formatDate(startTime) || "",
-        formatDate(endTime) || "",
-        intervalSeconds
-      )
-    : new Map();
+  // const aggregatedData = data
+  //   ? aggregateData(
+  //       data,
+  //       formatDate(startTime) || "",
+  //       formatDate(endTime) || "",
+  //       intervalSeconds
+  //     )
+  //   : new Map();
 
   if (isLoading) {
     return <div>Loading...</div>;
@@ -157,9 +157,11 @@ export default function StatsDisplay({ session }: { session: Session }) {
 
   return (
     <div className="flex gap-4">
-      {[...aggregatedData].map(([key, value]) => (
+      {/* {[...aggregatedData].map(([key, value]) => (
         <pre key={key}>{JSON.stringify({ [key]: value }, null, 2)}</pre>
-      ))}
+      ))} */}
+
+      <pre>{JSON.stringify(data, null, 2)}</pre>
     </div>
   );
 }

@@ -25,13 +25,17 @@ export interface TimeWindow {
   end: Date;
 }
 
+interface TimeSeriesMetadata {
+  resolution?: string;
+  aggregationType?: string;
+  count?: number; // Number of times this record has been averaged
+}
+
 export interface TimeSeriesPoint {
+  id?: string;
   timestamp: Date;
   containers: {
-    [containerId: string]: ContainerStats;
+    [id: string]: ContainerStats;
   };
-  metadata?: {
-    resolution?: string;
-    aggregationType?: string;
-  };
+  metadata?: TimeSeriesMetadata;
 }

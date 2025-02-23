@@ -4,7 +4,7 @@ import {
   TimeSeriesPoint,
   ContainerStats,
 } from "../types/index.js";
-import PocketBase from "pocketbase";
+import PocketBase from "../../node_modules/pocketbase/dist/pocketbase.es.mjs";
 import { average } from "../utils.js";
 
 export const TIME_SERIES_CONFIGS: TimeSeriesConfig[] = [
@@ -106,7 +106,8 @@ export class TimeSeriesManager {
     resolution: string
   ): boolean {
     const resolutionMs = this.parseTimeValue(resolution);
-    return timestamp.getTime() % resolutionMs === 0;
+    const timestampMs = timestamp.getTime();
+    return timestampMs % resolutionMs < 1000; // Allow 1 second tolerance
   }
 
   private getAggregationWindow(
@@ -125,8 +126,11 @@ export class TimeSeriesManager {
     window: TimeWindow,
     sourceConfig: TimeSeriesConfig
   ): Promise<TimeSeriesPoint[]> {
+    const start = window.start.toISOString().slice(0, -1) + ".000Z";
+    const end = window.end.toISOString().slice(0, -1) + ".000Z";
+
     const records = await this.pb.collection(sourceConfig.id).getList(1, 1000, {
-      filter: `timestamp >= '${window.start.toISOString()}' && timestamp < '${window.end.toISOString()}'`,
+      filter: `timestamp >= "${start}" && timestamp <= "${end}"`,
       sort: "timestamp",
     });
 
@@ -185,53 +189,207 @@ export class TimeSeriesManager {
   private async storeAggregatedData(
     collectionId: string,
     timestamp: Date,
-    data: TimeSeriesPoint
+    newData: TimeSeriesPoint
   ) {
-    await this.pb.collection(collectionId).create({
-      timestamp: timestamp.toISOString(),
-      containers: data.containers,
-      metadata: data.metadata,
-    });
-  }
+    try {
+      const formattedTimestamp = timestamp.toISOString().replace("T", " ");
 
-  async aggregateStats(timestamp: Date) {
-    for (const config of TIME_SERIES_CONFIGS) {
-      if (config.id === "stats_realtime") continue;
+      // Check if a record already exists for this timestamp
+      const existing = await this.pb
+        .collection(collectionId)
+        .getFirstListItem(`timestamp = '${formattedTimestamp}'`)
+        .catch(() => null);
 
-      if (this.shouldAggregateForResolution(timestamp, config.resolution)) {
-        const window = this.getAggregationWindow(timestamp, config);
-        const sourceConfig = this.getSourceConfigForAggregation(config);
+      if (existing) {
+        // Update existing record with new running average
+        const oldCount = existing.metadata?.count || 1;
+        const newCount = oldCount + 1;
 
-        if (sourceConfig) {
-          const sourceData = await this.fetchSourceData(window, sourceConfig);
-          if (sourceData.length > 0) {
-            const aggregatedData = this.aggregateData(
-              sourceData,
-              config.resolution
-            );
-            await this.storeAggregatedData(
-              config.id,
-              timestamp,
-              aggregatedData
-            );
+        const mergedContainers: { [id: string]: ContainerStats } = {};
+        const allContainerIds = new Set([
+          ...Object.keys(existing.containers),
+          ...Object.keys(newData.containers),
+        ]);
+
+        for (const id of allContainerIds) {
+          const oldStats = existing.containers[id];
+          const newStats = newData.containers[id];
+
+          if (oldStats && newStats) {
+            // Calculate running average
+            mergedContainers[id] = {
+              name: newStats.name,
+              cpu_percent:
+                (oldStats.cpu_percent * oldCount + newStats.cpu_percent) /
+                newCount,
+              memory_usage:
+                (oldStats.memory_usage * oldCount + newStats.memory_usage) /
+                newCount,
+              memory_limit: newStats.memory_limit,
+              memory_percent:
+                (oldStats.memory_percent * oldCount + newStats.memory_percent) /
+                newCount,
+              net_io_in:
+                (oldStats.net_io_in * oldCount + newStats.net_io_in) / newCount,
+              net_io_out:
+                (oldStats.net_io_out * oldCount + newStats.net_io_out) /
+                newCount,
+              block_io_in:
+                (oldStats.block_io_in * oldCount + newStats.block_io_in) /
+                newCount,
+              block_io_out:
+                (oldStats.block_io_out * oldCount + newStats.block_io_out) /
+                newCount,
+              pids: Math.round(
+                (oldStats.pids * oldCount + newStats.pids) / newCount
+              ),
+            };
+          } else {
+            mergedContainers[id] = oldStats || newStats;
           }
         }
+
+        await this.pb.collection(collectionId).update(existing.id, {
+          containers: mergedContainers,
+          metadata: {
+            ...newData.metadata,
+            count: newCount,
+          },
+        });
+      } else {
+        // Create new record
+        await this.pb.collection(collectionId).create({
+          timestamp: formattedTimestamp,
+          containers: newData.containers,
+          metadata: {
+            ...newData.metadata,
+            count: 1,
+          },
+        });
       }
+    } catch (error) {
+      console.error("Full error details:", error);
+      throw error;
     }
   }
 
-  private getSourceConfigForAggregation(
-    targetConfig: TimeSeriesConfig
-  ): TimeSeriesConfig | null {
-    const targetStartMs = this.parseTimeValue(targetConfig.startFrom || "0");
+  private async moveAndAggregateOutdatedRecords(
+    sourceConfig: TimeSeriesConfig,
+    config: TimeSeriesConfig
+  ) {
+    // Calculate the retention window for this collection
+    const now = Date.now();
+    const retentionStart = now - this.parseTimeValue(config.retention);
+    const retentionEnd = config.startFrom
+      ? now - this.parseTimeValue(config.startFrom)
+      : now;
 
-    // Find the config that covers the period just before this one
-    return (
-      TIME_SERIES_CONFIGS.find((config) => {
-        const configUntilMs = this.parseTimeValue(config.until || "Infinity");
-        return configUntilMs === targetStartMs;
-      }) || null
-    );
+    // Find records in source collection that fall within this collection's window
+    const records = await this.pb.collection(sourceConfig.id).getList(1, 1000, {
+      filter: `timestamp >= '${new Date(retentionStart)
+        .toISOString()
+        .replace("T", " ")}' && timestamp < '${new Date(retentionEnd)
+        .toISOString()
+        .replace("T", " ")}'`,
+      sort: "timestamp",
+    });
+
+    if (records.items.length === 0) return;
+
+    // Group records by their target aggregation window
+    const resolutionMs = this.parseTimeValue(config.resolution);
+    const recordsByWindow = new Map<number, TimeSeriesPoint[]>();
+
+    records.items.forEach((record) => {
+      const recordTime = new Date(record.timestamp).getTime();
+      const windowStart = Math.floor(recordTime / resolutionMs) * resolutionMs;
+
+      if (!recordsByWindow.has(windowStart)) {
+        recordsByWindow.set(windowStart, []);
+      }
+      recordsByWindow.get(windowStart)?.push({
+        timestamp: new Date(record.timestamp),
+        containers: record.containers,
+        metadata: record.metadata,
+      });
+    });
+
+    // Aggregate and store records in target collection
+    for (const [windowStart, windowRecords] of recordsByWindow) {
+      const aggregatedData = this.aggregateData(
+        windowRecords,
+        config.resolution
+      );
+
+      try {
+        await this.storeAggregatedData(
+          config.id,
+          new Date(windowStart),
+          aggregatedData
+        );
+
+        // Delete the processed records from source collection
+        for (const record of windowRecords) {
+          if (record.id) {
+            await this.pb.collection(sourceConfig.id).delete(record.id);
+          }
+        }
+
+        console.log(
+          `Moved and aggregated ${windowRecords.length} records from ${sourceConfig.id} to ${config.id}`
+        );
+      } catch (error) {
+        console.error(`Error processing records for ${config.id}:`, error);
+      }
+    }
+
+    // After processing all records, cleanup any duplicates or out-of-window records
+    try {
+      const records = await this.pb.collection(config.id).getFullList({
+        filter: `timestamp >= '${new Date(retentionStart)
+          .toISOString()
+          .replace("T", " ")}' && timestamp < '${new Date(retentionEnd)
+          .toISOString()
+          .replace("T", " ")}'`,
+        sort: "timestamp",
+      });
+
+      const seenWindows = new Set<number>();
+      for (const record of records) {
+        const recordTime = new Date(record.timestamp).getTime();
+        const windowStart =
+          Math.floor(recordTime / resolutionMs) * resolutionMs;
+
+        if (seenWindows.has(windowStart)) {
+          // Delete duplicate timestamps
+          await this.pb.collection(config.id).delete(record.id);
+        } else {
+          seenWindows.add(windowStart);
+        }
+      }
+    } catch (error) {
+      console.error(`Error cleaning up records for ${config.id}:`, error);
+    }
+  }
+
+  async aggregateStats(timestamp: Date) {
+    try {
+      for (const config of TIME_SERIES_CONFIGS) {
+        if (config.id === "stats_realtime") continue;
+
+        const sourceConfig = TIME_SERIES_CONFIGS.find(
+          (c) =>
+            this.parseTimeValue(c.until || "Infinity") ===
+            this.parseTimeValue(config.startFrom || "0")
+        );
+
+        if (!sourceConfig) continue;
+
+        await this.moveAndAggregateOutdatedRecords(sourceConfig, config);
+      }
+    } catch (error) {
+      console.error("Error in aggregation cycle:", error);
+    }
   }
 
   selectAppropriateConfig(timeRange: TimeWindow): TimeSeriesConfig {
@@ -295,12 +453,15 @@ export class TimeSeriesManager {
     queryRanges.sort((a, b) => a.start.getTime() - b.start.getTime());
 
     // Query data from all relevant collections
-    const dataPromises = queryRanges.map((range) =>
-      this.pb.collection(range.collection).getList(1, 1000, {
-        filter: `timestamp >= '${range.start.toISOString()}' && timestamp <= '${range.end.toISOString()}'`,
-        sort: "timestamp",
-      })
-    );
+    const dataPromises = queryRanges.map((range) => {
+      const start = range.start.toISOString().slice(0, -1) + ".000Z";
+      const end = range.end.toISOString().slice(0, -1) + ".000Z";
+
+      return this.pb.collection(range.collection).getList(1, 1000, {
+        sort: "-timestamp",
+        filter: `timestamp >= "${start}" && timestamp <= "${end}"`,
+      });
+    });
 
     const results = await Promise.all(dataPromises);
 
