@@ -1,63 +1,116 @@
+import cors from "cors";
 import express from "express";
-import http from "http";
-import PocketBase from "pocketbase";
-import { exec } from "child_process";
 const app = express();
-const server = http.createServer(app);
-const PORT = process.env.PORT || 3000;
-const pb = new PocketBase(process.env.POCKETBASE_URL || "http://0.0.0.0:8090");
-// Add these environment variables
-const ADMIN_EMAIL = process.env.POCKETBASE_ADMIN_EMAIL;
-const ADMIN_PASSWORD = process.env.POCKETBASE_ADMIN_PASSWORD;
+// const server = http.createServer(app);
+const PORT = process.env.PORT || 8000;
+// const timeSeriesManager = new TimeSeriesManager(superuserClient);
 app.use(express.json());
-// Function to collect and save Docker stats
-const collectDockerStats = () => {
-    exec("docker stats --no-stream --format '{{json .}}'", async (err, stdout, stderr) => {
-        if (err) {
-            console.error("Error executing docker stats:", err);
-            return;
-        }
-        if (stderr) {
-            console.error("Error:", stderr);
-            return;
-        }
-        const stats = stdout
-            .trim()
-            .split("\n")
-            .map((line) => JSON.parse(line));
-        // Save stats to PocketBase
-        try {
-            await pb.collection("container_stats").create(stats[0]);
-        }
-        catch (error) {
-            console.error("Error saving to PocketBase:", error);
-        }
-    });
-};
-// Function to test PocketBase connection
-async function testPocketBaseConnection() {
-    try {
-        // Try to get the health status of the server
-        const health = await pb.health.check();
-        console.log("✅ PocketBase connection successful:", health);
-        return true;
-    }
-    catch (error) {
-        console.error("❌ Failed to connect to PocketBase:", error);
-        return false;
-    }
-}
-// Modify server startup to include connection test
-server.listen(PORT, async () => {
+app.use(cors());
+// const collectDockerStats = (): Promise<{
+//   [containerId: string]: ContainerStats;
+// }> => {
+//   return new Promise((resolve) => {
+//     exec(
+//       "docker stats --no-stream --format '{{json .}}'",
+//       async (err, stdout, stderr) => {
+//         if (err || stderr) {
+//           console.error(err || stderr);
+//           resolve({});
+//           return;
+//         }
+//         const containerStats = stdout
+//           .trim()
+//           .split("\n")
+//           .map((line) => JSON.parse(line))
+//           .map((stat) => {
+//             const formatted = formatDockerStats(stat);
+//             return [formatted.name, formatted] as const;
+//           })
+//           .reduce<{ [key: string]: ContainerStats }>((acc, [name, stats]) => {
+//             acc[name] = stats;
+//             return acc;
+//           }, {});
+//         resolve(containerStats);
+//       }
+//     );
+//   });
+// };
+// // Function to test PocketBase connection
+// async function testPocketBaseConnection() {
+//   try {
+//     const health = await superuserClient.health.check();
+//     console.log("✅ PocketBase connection successful:", health);
+//     return true;
+//   } catch (error) {
+//     console.error("❌ Failed to connect to PocketBase:", error);
+//     return false;
+//   }
+// }
+// let isCollecting = false;
+app.get("/api/hello", (req, res) => {
+    res.json({ message: "Hello, world!" });
+});
+// // Setup routes
+// app.get("/api/stats/history", async (req, res) => {
+//   try {
+//     const start = new Date(req.query.start as string);
+//     const end = new Date(req.query.end as string);
+//     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+//       res.status(400).json({ error: "Invalid date range" });
+//       return;
+//     }
+//     const stats = await timeSeriesManager.getContainerStats({ start, end });
+//     res.json(stats);
+//   } catch (error) {
+//     console.error("Error fetching historical stats:", error);
+//     res.status(500).json({ error: "Failed to fetch historical stats" });
+//   }
+// });
+// app.get("/api/stats/live", async (req, res) => {
+//   try {
+//     const stats = await collectDockerStats();
+//     res.json(stats);
+//   } catch (error) {
+//     console.error("Error fetching live stats:", error);
+//     res.status(500).json({ error: "Failed to fetch live stats" });
+//   }
+// });
+// Start server
+app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
-    // Test connection before starting stats collection
-    const isConnected = await testPocketBaseConnection();
-    if (isConnected) {
-        // Only start collecting stats if connection is successful
-        setInterval(collectDockerStats, 5000);
-    }
-    else {
-        console.error("Stats collection disabled due to PocketBase connection failure");
-    }
+    // // Test connection and authenticate
+    // const isConnected = await testPocketBaseConnection();
+    // if (!isConnected) {
+    //   console.error("Failed to connect to PocketBase. Exiting...");
+    //   process.exit(1);
+    // }
+    // const interval = 10000; // Default to 10 seconds
+    // setInterval(async () => {
+    //   if (isCollecting) return; // Skip if already collecting
+    //   isCollecting = true;
+    //   try {
+    //     const timestamp = new Date();
+    //     const stats = await collectDockerStats();
+    //     // Store in realtime collection
+    //     await superuserClient.collection("stats_realtime").create({
+    //       timestamp: timestamp.toISOString(),
+    //       containers: stats,
+    //       metadata: {
+    //         resolution: "10s",
+    //         type: "raw",
+    //       },
+    //     });
+    //     // Handle aggregations
+    //     await timeSeriesManager.aggregateStats(timestamp);
+    //     // Cleanup old data periodically (every 5 minutes)
+    //     if (timestamp.getMinutes() % 5 === 0 && timestamp.getSeconds() === 0) {
+    //       await timeSeriesManager.cleanupOldData();
+    //     }
+    //   } catch (error) {
+    //     console.error("Error in collection cycle:", error);
+    //   } finally {
+    //     isCollecting = false;
+    //   }
+    // }, interval);
 });
 //# sourceMappingURL=server.js.map

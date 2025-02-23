@@ -1,4 +1,13 @@
-export type Stats = {
+export interface TimeSeriesConfig {
+  id: string;
+  name: string;
+  retention: string;
+  resolution: string;
+  startFrom?: string;
+  until?: string;
+}
+
+export interface ContainerStats {
   name: string;
   cpu_percent: number;
   memory_usage: number;
@@ -9,5 +18,24 @@ export type Stats = {
   block_io_in: number;
   block_io_out: number;
   pids: number;
-  timestamp: string;
-};
+}
+
+export interface TimeWindow {
+  start: Date;
+  end: Date;
+}
+
+interface TimeSeriesMetadata {
+  resolution?: string;
+  aggregationType?: string;
+  count?: number; // Number of times this record has been averaged
+}
+
+export interface TimeSeriesPoint {
+  id?: string;
+  timestamp: Date;
+  containers: {
+    [id: string]: ContainerStats;
+  };
+  metadata?: TimeSeriesMetadata;
+}

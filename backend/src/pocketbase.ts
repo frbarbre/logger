@@ -1,4 +1,4 @@
-import PocketBase from "pocketbase";
+import PocketBase from "../node_modules/pocketbase/dist/pocketbase.es.mjs";
 
 const superuserClient = new PocketBase(
   process.env.POCKETBASE_URL || "http://pocketbase:8090"

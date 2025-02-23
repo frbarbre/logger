@@ -1,102 +1,48 @@
-import { exec } from "child_process";
-import express from "express";
-import http from "http";
-import superuserClient from "./pocketbase.js";
-import { checkValidNumber, formatDockerStats, average } from "./utils.js";
 import cors from "cors";
-import { Stats } from "types/index.js";
-import lodash from "lodash";
-const { groupBy } = lodash;
+import express from "express";
+import { TimeSeriesManager } from "./lib/time-series-manager.js";
+import superuserClient from "./pocketbase.js";
+import { ContainerStats } from "./types/index.js";
+import { formatDockerStats } from "./utils.js";
+import { exec } from "child_process";
+import http from "http";
 
 const app = express();
 const server = http.createServer(app);
 
 const PORT = process.env.PORT || 8000;
+const timeSeriesManager = new TimeSeriesManager(superuserClient);
 
 app.use(express.json());
 app.use(cors());
 
-const aggregateAndSaveStats = async (stats: Stats[]) => {
-  const now = new Date();
-  const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-  const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-  // Save current stats at full resolution
-  for (const stat of stats) {
-    await superuserClient.collection("container_stats").create(stat);
-  }
-
-  // Aggregate older data
-  const oldRecords = await superuserClient
-    .collection("container_stats")
-    .getList(1, 1000, {
-      filter: `timestamp < '${hourAgo.toISOString()}'`,
-      sort: "-timestamp",
-    });
-
-  if (oldRecords.items.length > 0) {
-    // Group by container and 5-minute intervals for data older than 1 hour
-    const groupedStats = groupBy(oldRecords.items, (record) => {
-      const timestamp = new Date(record.timestamp);
-      const interval = timestamp > dayAgo ? 60000 : 300000; // 1 min or 5 min
-      const roundedTime = Math.floor(timestamp.getTime() / interval) * interval;
-      return `${record.name}_${roundedTime}`;
-    });
-
-    // Calculate averages and save aggregated data
-    for (const [_, records] of Object.entries(groupedStats)) {
-      if (records.length <= 1) continue;
-
-      const avgStats = {
-        name: records[0].name,
-        cpu_percent: average(records.map((r) => r.cpu_percent)),
-        memory_usage: average(records.map((r) => r.memory_usage)),
-        memory_limit: records[0].memory_limit,
-        memory_percent: average(records.map((r) => r.memory_percent)),
-        net_io_in: average(records.map((r) => r.net_io_in)),
-        net_io_out: average(records.map((r) => r.net_io_out)),
-        block_io_in: average(records.map((r) => r.block_io_in)),
-        block_io_out: average(records.map((r) => r.block_io_out)),
-        pids: Math.round(average(records.map((r) => r.pids))),
-        timestamp: new Date(
-          Math.max(...records.map((r) => new Date(r.timestamp).getTime()))
-        ).toISOString(),
-      };
-
-      // Delete old records and save aggregated record
-      for (const record of records.slice(1)) {
-        await superuserClient.collection("container_stats").delete(record.id);
-      }
-      await superuserClient
-        .collection("container_stats")
-        .update(records[0].id, avgStats);
-    }
-  }
-};
-
-const collectDockerStats = (prevStats: Stats[]): Promise<Stats[]> => {
+const collectDockerStats = (): Promise<{
+  [containerId: string]: ContainerStats;
+}> => {
   return new Promise((resolve) => {
     exec(
       "docker stats --no-stream --format '{{json .}}'",
       async (err, stdout, stderr) => {
-        if (err) {
-          console.error("Error executing docker stats:", err);
-          resolve([]);
+        if (err || stderr) {
+          console.error(err || stderr);
+          resolve({});
           return;
         }
-        if (stderr) {
-          console.error("Error:", stderr);
-          resolve([]);
-          return;
-        }
-        const stats = stdout
+
+        const containerStats = stdout
           .trim()
           .split("\n")
           .map((line) => JSON.parse(line))
-          .map((stat) => formatDockerStats(stat));
+          .map((stat) => {
+            const formatted = formatDockerStats(stat);
+            return [formatted.name, formatted] as const;
+          })
+          .reduce<{ [key: string]: ContainerStats }>((acc, [name, stats]) => {
+            acc[name] = stats;
+            return acc;
+          }, {});
 
-        await aggregateAndSaveStats(stats);
-        resolve(stats);
+        resolve(containerStats);
       }
     );
   });
@@ -105,7 +51,6 @@ const collectDockerStats = (prevStats: Stats[]): Promise<Stats[]> => {
 // Function to test PocketBase connection
 async function testPocketBaseConnection() {
   try {
-    // Try to get the health status of the server
     const health = await superuserClient.health.check();
     console.log("✅ PocketBase connection successful:", health);
     return true;
@@ -117,34 +62,78 @@ async function testPocketBaseConnection() {
 
 let isCollecting = false;
 
-// Modify server startup
+// Setup routes
+app.get("/api/stats/history", async (req, res) => {
+  try {
+    const start = new Date(req.query.start as string);
+    const end = new Date(req.query.end as string);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      res.status(400).json({ error: "Invalid date range" });
+      return;
+    }
+
+    const stats = await timeSeriesManager.getContainerStats({ start, end });
+    res.json(stats);
+  } catch (error) {
+    console.error("Error fetching historical stats:", error);
+    res.status(500).json({ error: "Failed to fetch historical stats" });
+  }
+});
+
+app.get("/api/stats/live", async (req, res) => {
+  try {
+    const stats = await collectDockerStats();
+    res.json(stats);
+  } catch (error) {
+    console.error("Error fetching live stats:", error);
+    res.status(500).json({ error: "Failed to fetch live stats" });
+  }
+});
+
+// Start server
 server.listen(PORT, async () => {
   console.log(`Server is running on port ${PORT}`);
 
   // Test connection and authenticate
   const isConnected = await testPocketBaseConnection();
 
-  const interval = checkValidNumber(process.env.INTERVAL || "5000");
-
-  console.log("Interval:", interval);
-
-  let prevStats: Stats[] = [];
-
-  if (isConnected) {
-    setInterval(async () => {
-      if (isCollecting) return; // Skip if already collecting
-      isCollecting = true;
-
-      try {
-        const stats = await collectDockerStats(prevStats);
-        prevStats = stats;
-      } finally {
-        isCollecting = false;
-      }
-    }, interval);
-  } else {
-    console.error(
-      "Stats collection disabled due to PocketBase connection failure"
-    );
+  if (!isConnected) {
+    console.error("Failed to connect to PocketBase. Exiting...");
+    process.exit(1);
   }
+
+  const interval = 10000; // Default to 10 seconds
+
+  setInterval(async () => {
+    if (isCollecting) return; // Skip if already collecting
+    isCollecting = true;
+
+    try {
+      const timestamp = new Date();
+      const stats = await collectDockerStats();
+
+      // Store in realtime collection
+      await superuserClient.collection("stats_realtime").create({
+        timestamp: timestamp.toISOString(),
+        containers: stats,
+        metadata: {
+          resolution: "10s",
+          type: "raw",
+        },
+      });
+
+      // Handle aggregations
+      await timeSeriesManager.aggregateStats(timestamp);
+
+      // Cleanup old data periodically (every 5 minutes)
+      if (timestamp.getMinutes() % 5 === 0 && timestamp.getSeconds() === 0) {
+        await timeSeriesManager.cleanupOldData();
+      }
+    } catch (error) {
+      console.error("Error in collection cycle:", error);
+    } finally {
+      isCollecting = false;
+    }
+  }, interval);
 });

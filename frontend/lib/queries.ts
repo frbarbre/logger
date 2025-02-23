@@ -14,9 +14,11 @@ export async function getContainerStatsBetweenDates(
   let allItems: RecordModel[] = [];
   let page = 1;
 
+  console.log(startTime, endTime);
+
   while (true) {
     const records = await pb
-      .collection("container_stats")
+      .collection("stats_realtime")
       .getList(page, perPage, {
         sort: "-timestamp",
         filter: `timestamp >= "${startTime}" && timestamp <= "${endTime}"`,
