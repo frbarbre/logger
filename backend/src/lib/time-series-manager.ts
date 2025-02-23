@@ -101,45 +101,6 @@ export class TimeSeriesManager {
     return num;
   }
 
-  private shouldAggregateForResolution(
-    timestamp: Date,
-    resolution: string
-  ): boolean {
-    const resolutionMs = this.parseTimeValue(resolution);
-    const timestampMs = timestamp.getTime();
-    return timestampMs % resolutionMs < 1000; // Allow 1 second tolerance
-  }
-
-  private getAggregationWindow(
-    timestamp: Date,
-    config: TimeSeriesConfig
-  ): TimeWindow {
-    const resolutionMs = this.parseTimeValue(config.resolution);
-    const end = new Date(
-      Math.floor(timestamp.getTime() / resolutionMs) * resolutionMs
-    );
-    const start = new Date(end.getTime() - resolutionMs);
-    return { start, end };
-  }
-
-  private async fetchSourceData(
-    window: TimeWindow,
-    sourceConfig: TimeSeriesConfig
-  ): Promise<TimeSeriesPoint[]> {
-    const start = window.start.toISOString().slice(0, -1) + ".000Z";
-    const end = window.end.toISOString().slice(0, -1) + ".000Z";
-
-    const records = await this.pb.collection(sourceConfig.id).getList(1, 1000, {
-      filter: `timestamp >= "${start}" && timestamp <= "${end}"`,
-      sort: "timestamp",
-    });
-
-    return records.items.map((record) => ({
-      timestamp: new Date(record.timestamp),
-      containers: record.containers,
-    }));
-  }
-
   private aggregateContainerStats(stats: ContainerStats[]): ContainerStats {
     return {
       name: stats[0].name,
@@ -192,7 +153,8 @@ export class TimeSeriesManager {
     newData: TimeSeriesPoint
   ) {
     try {
-      const formattedTimestamp = timestamp.toISOString().replace("T", " ");
+      const formattedTimestamp =
+        timestamp.toISOString().replace("T", " ") + ".000Z";
 
       // Check if a record already exists for this timestamp
       const existing = await this.pb
@@ -372,7 +334,7 @@ export class TimeSeriesManager {
     }
   }
 
-  async aggregateStats(timestamp: Date) {
+  async aggregateStats() {
     try {
       for (const config of TIME_SERIES_CONFIGS) {
         if (config.id === "stats_realtime") continue;
@@ -454,9 +416,10 @@ export class TimeSeriesManager {
 
     // Query data from all relevant collections
     const dataPromises = queryRanges.map((range) => {
-      const start = range.start.toISOString().slice(0, -1) + ".000Z";
-      const end = range.end.toISOString().slice(0, -1) + ".000Z";
+      const start = range.start.toISOString().replace("T", " ");
+      const end = range.end.toISOString().replace("T", " ");
 
+      console.log(start, end);
       return this.pb.collection(range.collection).getList(1, 1000, {
         sort: "-timestamp",
         filter: `timestamp >= "${start}" && timestamp <= "${end}"`,

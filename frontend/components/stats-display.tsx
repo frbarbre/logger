@@ -131,12 +131,12 @@ export default function StatsDisplay({ session }: { session: Session }) {
   } = useQuery(containerStatsBetweenDatesQuery(pb, startTime, endTime));
 
   useEffect(() => {
-    pb.collection("container_stats").subscribe("*", async () => {
+    pb.collection("stats_realtime").subscribe("*", async () => {
       await refetch();
     });
 
     return () => {
-      pb.collection("container_stats").unsubscribe();
+      pb.collection("stats_realtime").unsubscribe();
     };
   }, [refetch]);
 

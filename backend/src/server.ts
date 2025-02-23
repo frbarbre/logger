@@ -128,7 +128,7 @@ server.listen(PORT, async () => {
       });
 
       // Handle aggregations
-      await timeSeriesManager.aggregateStats(timestamp);
+      await timeSeriesManager.aggregateStats();
 
       // Cleanup old data periodically (every 5 minutes)
       if (timestamp.getMinutes() % 5 === 0 && timestamp.getSeconds() === 0) {
