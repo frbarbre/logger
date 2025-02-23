@@ -1,54 +1,27 @@
 migrate(
   (db) => {
+    console.log("Creating superuser");
+    // Create superuser
+    const admin = new Record(db.findCollectionByNameOrId("_superusers"));
+    admin.set("email", process.env.POCKETBASE_ADMIN_EMAIL);
+    admin.set("password", process.env.POCKETBASE_ADMIN_PASSWORD);
+    db.save(admin);
+
     const collections = [
-      {
-        id: "stats_realtime",
-        name: "stats_realtime",
-        resolution: "10s",
-      },
-      {
-        id: "stats_10m",
-        name: "stats_10m",
-        resolution: "10m",
-      },
-      {
-        id: "stats_15m",
-        name: "stats_15m",
-        resolution: "15m",
-      },
-      {
-        id: "stats_30m",
-        name: "stats_30m",
-        resolution: "30m",
-      },
-      {
-        id: "stats_1h",
-        name: "stats_1h",
-        resolution: "1h",
-      },
-      {
-        id: "stats_3h",
-        name: "stats_3h",
-        resolution: "3h",
-      },
-      {
-        id: "stats_6h",
-        name: "stats_6h",
-        resolution: "6h",
-      },
-      {
-        id: "stats_9h",
-        name: "stats_9h",
-        resolution: "9h",
-      },
-      {
-        id: "stats_12h",
-        name: "stats_12h",
-        resolution: "12h",
-      },
+      { id: "stats_realtime", name: "stats_realtime" },
+      { id: "stats_5m", name: "stats_5m" },
+      { id: "stats_10m", name: "stats_10m" },
+      { id: "stats_15m", name: "stats_15m" },
+      { id: "stats_30m", name: "stats_30m" },
+      { id: "stats_1h", name: "stats_1h" },
+      { id: "stats_3h", name: "stats_3h" },
+      { id: "stats_6h", name: "stats_6h" },
+      { id: "stats_9h", name: "stats_9h" },
+      { id: "stats_12h", name: "stats_12h" },
     ];
 
     for (let config of collections) {
+      console.log(`Creating ${config.name} collection`);
       const collection = new Collection({
         id: config.id,
         name: config.name,
@@ -65,7 +38,7 @@ migrate(
         indexes: [
           `CREATE INDEX idx_${config.name}_timestamp ON ${config.name} (timestamp)`,
         ],
-        schema: [
+        fields: [
           {
             id: "field_timestamp",
             name: "timestamp",
@@ -95,11 +68,9 @@ migrate(
 
       db.save(collection);
     }
-
-    return db;
   },
   (db) => {
-    // Revert all collections in reverse order
+    // Delete collections in reverse order
     const collections = [
       "stats_12h",
       "stats_9h",
@@ -118,7 +89,5 @@ migrate(
         db.deleteCollection(collection.id);
       }
     }
-
-    return db;
   }
 );

@@ -16,11 +16,19 @@ export const TIME_SERIES_CONFIGS: TimeSeriesConfig[] = [
     until: "1h",
   },
   {
+    id: "stats_5m",
+    name: "stats_5m",
+    retention: "6h",
+    resolution: "5m",
+    startFrom: "1h",
+    until: "3h",
+  },
+  {
     id: "stats_10m",
     name: "stats_10m",
     retention: "6h",
     resolution: "10m",
-    startFrom: "1h",
+    startFrom: "3h",
     until: "6h",
   },
   {
@@ -246,18 +254,69 @@ export class TimeSeriesManager {
   }
 
   async getContainerStats(timeRange: TimeWindow): Promise<TimeSeriesPoint[]> {
-    const config = this.selectAppropriateConfig(timeRange);
+    const now = Date.now();
+    const queryRanges: Array<{
+      collection: string;
+      start: Date;
+      end: Date;
+    }> = [];
 
-    const records = await this.pb.collection(config.id).getList(1, 1000, {
-      filter: `timestamp >= '${timeRange.start.toISOString()}' && timestamp <= '${timeRange.end.toISOString()}'`,
-      sort: "timestamp",
-    });
+    // Find all applicable time ranges and their corresponding collections
+    for (const config of TIME_SERIES_CONFIGS) {
+      const startFromMs = config.startFrom
+        ? this.parseTimeValue(config.startFrom)
+        : 0;
+      const untilMs = config.until
+        ? this.parseTimeValue(config.until)
+        : Infinity;
 
-    return records.items.map((record) => ({
-      timestamp: new Date(record.timestamp),
-      containers: record.containers,
-      metadata: record.metadata,
-    }));
+      // Calculate the time window for this resolution
+      const windowStart = new Date(now - untilMs);
+      const windowEnd = new Date(now - startFromMs);
+
+      // Check if this resolution's window overlaps with the requested time range
+      const rangeStart = new Date(
+        Math.max(timeRange.start.getTime(), windowStart.getTime())
+      );
+      const rangeEnd = new Date(
+        Math.min(timeRange.end.getTime(), windowEnd.getTime())
+      );
+
+      if (rangeStart < rangeEnd) {
+        queryRanges.push({
+          collection: config.id,
+          start: rangeStart,
+          end: rangeEnd,
+        });
+      }
+    }
+
+    // Sort ranges by start time to ensure proper ordering
+    queryRanges.sort((a, b) => a.start.getTime() - b.start.getTime());
+
+    // Query data from all relevant collections
+    const dataPromises = queryRanges.map((range) =>
+      this.pb.collection(range.collection).getList(1, 1000, {
+        filter: `timestamp >= '${range.start.toISOString()}' && timestamp <= '${range.end.toISOString()}'`,
+        sort: "timestamp",
+      })
+    );
+
+    const results = await Promise.all(dataPromises);
+
+    // Merge all results and sort by timestamp
+    const allPoints = results.flatMap((result) =>
+      result.items.map((record) => ({
+        timestamp: new Date(record.timestamp),
+        containers: record.containers,
+        metadata: record.metadata,
+      }))
+    );
+
+    // Sort by timestamp to ensure proper ordering
+    return allPoints.sort(
+      (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+    );
   }
 
   async cleanupOldData() {

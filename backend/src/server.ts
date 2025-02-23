@@ -1,11 +1,11 @@
-import { exec } from "child_process";
-import express from "express";
-import http from "http";
-import superuserClient from "./pocketbase.js";
-import { TimeSeriesManager } from "./lib/time-series-manager.js";
-import { formatDockerStats } from "./utils.js";
 import cors from "cors";
+import express from "express";
+import { TimeSeriesManager } from "./lib/time-series-manager.js";
+import superuserClient from "./pocketbase.js";
 import { ContainerStats } from "./types/index.js";
+import { formatDockerStats } from "./utils.js";
+import { exec } from "child_process";
+import http from "http";
 
 const app = express();
 const server = http.createServer(app);
@@ -103,11 +103,7 @@ server.listen(PORT, async () => {
     process.exit(1);
   }
 
-  const interval = process.env.COLLECTION_INTERVAL
-    ? parseInt(process.env.COLLECTION_INTERVAL)
-    : 10000; // Default to 10 seconds
-
-  console.log(`Collection interval: ${interval}ms`);
+  const interval = 10000; // Default to 10 seconds
 
   setInterval(async () => {
     if (isCollecting) return; // Skip if already collecting

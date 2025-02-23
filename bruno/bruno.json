@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "logger",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}
