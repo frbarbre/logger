@@ -62,6 +62,10 @@ async function testPocketBaseConnection() {
 
 let isCollecting = false;
 
+app.get("/hello", (req, res) => {
+  res.status(200).json({ message: "Hello World" });
+});
+
 // Setup routes
 app.get("/api/stats/history", async (req, res) => {
   try {
