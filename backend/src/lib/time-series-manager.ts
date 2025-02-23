@@ -6,99 +6,138 @@ import {
 } from "../types/index.js";
 import PocketBase from "../../node_modules/pocketbase/dist/pocketbase.es.mjs";
 import { average } from "../utils.js";
+import debug from "debug";
+
+// Create namespaced debuggers
+const logConfig = debug("timeseries:config");
+const logAggregation = debug("timeseries:aggregation");
+const logStorage = debug("timeseries:storage");
+const logQuery = debug("timeseries:query");
+const logError = debug("timeseries:error");
+
+export const TIME_SCALE_FACTOR = process.env.NODE_ENV === "test" ? 1 : 1; // In test mode, 1 hour becomes 1 minute
 
 export const TIME_SERIES_CONFIGS: TimeSeriesConfig[] = [
   {
     id: "stats_realtime",
     name: "stats_realtime",
-    retention: "1h",
-    resolution: "10s",
-    until: "1h",
+    retention: `${60 * TIME_SCALE_FACTOR}m`, // 1 hour
+    resolution: `${10 * TIME_SCALE_FACTOR}s`,
+    startFrom: `${0 * TIME_SCALE_FACTOR}m`,
+    until: `${60 * TIME_SCALE_FACTOR}m`,
   },
   {
     id: "stats_5m",
     name: "stats_5m",
-    retention: "6h",
-    resolution: "5m",
-    startFrom: "1h",
-    until: "3h",
+    retention: `${6 * TIME_SCALE_FACTOR}h`,
+    resolution: `${5 * TIME_SCALE_FACTOR}m`,
+    startFrom: `${1 * TIME_SCALE_FACTOR}h`,
+    until: `${3 * TIME_SCALE_FACTOR}h`,
   },
   {
     id: "stats_10m",
     name: "stats_10m",
-    retention: "6h",
-    resolution: "10m",
-    startFrom: "3h",
-    until: "6h",
+    retention: `${6 * TIME_SCALE_FACTOR}h`,
+    resolution: `${10 * TIME_SCALE_FACTOR}m`,
+    startFrom: `${3 * TIME_SCALE_FACTOR}h`,
+    until: `${6 * TIME_SCALE_FACTOR}h`,
   },
   {
     id: "stats_15m",
     name: "stats_15m",
-    retention: "12h",
-    resolution: "15m",
-    startFrom: "6h",
-    until: "12h",
+    retention: `${12 * TIME_SCALE_FACTOR}h`,
+    resolution: `${15 * TIME_SCALE_FACTOR}m`,
+    startFrom: `${6 * TIME_SCALE_FACTOR}h`,
+    until: `${12 * TIME_SCALE_FACTOR}h`,
   },
   {
     id: "stats_30m",
     name: "stats_30m",
-    retention: "24h",
-    resolution: "30m",
-    startFrom: "12h",
-    until: "24h",
+    retention: `${24 * TIME_SCALE_FACTOR}h`,
+    resolution: `${30 * TIME_SCALE_FACTOR}m`,
+    startFrom: `${12 * TIME_SCALE_FACTOR}h`,
+    until: `${24 * TIME_SCALE_FACTOR}h`,
   },
   {
     id: "stats_1h",
     name: "stats_1h",
-    retention: "48h",
-    resolution: "1h",
-    startFrom: "24h",
-    until: "48h",
+    retention: `${48 * TIME_SCALE_FACTOR}h`,
+    resolution: `${1 * TIME_SCALE_FACTOR}h`,
+    startFrom: `${24 * TIME_SCALE_FACTOR}h`,
+    until: `${48 * TIME_SCALE_FACTOR}h`,
   },
   {
     id: "stats_3h",
     name: "stats_3h",
-    retention: "96h",
-    resolution: "3h",
-    startFrom: "48h",
-    until: "96h",
+    retention: `${96 * TIME_SCALE_FACTOR}h`,
+    resolution: `${3 * TIME_SCALE_FACTOR}h`,
+    startFrom: `${48 * TIME_SCALE_FACTOR}h`,
+    until: `${96 * TIME_SCALE_FACTOR}h`,
   },
   {
     id: "stats_6h",
     name: "stats_6h",
-    retention: "7d",
-    resolution: "6h",
-    startFrom: "96h",
-    until: "7d",
+    retention: `${7 * TIME_SCALE_FACTOR}d`,
+    resolution: `${6 * TIME_SCALE_FACTOR}h`,
+    startFrom: `${96 * TIME_SCALE_FACTOR}h`,
+    until: `${7 * TIME_SCALE_FACTOR}d`,
   },
   {
     id: "stats_9h",
     name: "stats_9h",
-    retention: "14d",
-    resolution: "9h",
-    startFrom: "7d",
-    until: "14d",
+    retention: `${14 * TIME_SCALE_FACTOR}d`,
+    resolution: `${9 * TIME_SCALE_FACTOR}h`,
+    startFrom: `${7 * TIME_SCALE_FACTOR}d`,
+    until: `${14 * TIME_SCALE_FACTOR}d`,
   },
   {
     id: "stats_12h",
     name: "stats_12h",
-    retention: "30d",
-    resolution: "12h",
-    startFrom: "14d",
-    until: "30d",
+    retention: `${30 * TIME_SCALE_FACTOR}d`,
+    resolution: `${12 * TIME_SCALE_FACTOR}h`,
+    startFrom: `${14 * TIME_SCALE_FACTOR}d`,
+    until: `${30 * TIME_SCALE_FACTOR}d`,
   },
 ];
 
 export class TimeSeriesManager {
-  constructor(private pb: PocketBase) {}
+  constructor(private pb: PocketBase) {
+    logConfig(
+      "Initializing TimeSeriesManager with TIME_SCALE_FACTOR:",
+      TIME_SCALE_FACTOR
+    );
+  }
 
-  private parseTimeValue(value: string): number {
-    const num = parseInt(value);
-    if (value.endsWith("s")) return num * 1000;
-    if (value.endsWith("m")) return num * 60 * 1000;
-    if (value.endsWith("h")) return num * 60 * 60 * 1000;
-    if (value.endsWith("d")) return num * 24 * 60 * 60 * 1000;
-    return num;
+  private parseTimeValue(value?: string): number {
+    if (!value) return 0;
+
+    // Læs numerisk del som float
+    const numericPart = parseFloat(value);
+    let ms = 0;
+
+    if (value.endsWith("s")) {
+      ms = numericPart * 1000;
+    } else if (value.endsWith("m")) {
+      ms = numericPart * 60 * 1000;
+    } else if (value.endsWith("h")) {
+      ms = numericPart * 60 * 60 * 1000;
+    } else if (value.endsWith("d")) {
+      ms = numericPart * 24 * 60 * 60 * 1000;
+    }
+
+    // Skaler millisekunder
+    const scaledMs = ms * TIME_SCALE_FACTOR;
+
+    // Log til debugging
+    logConfig("Parsed time value:", {
+      original: value,
+      numericPart,
+      unit: value.slice(-1),
+      unscaledMs: ms,
+      scaledMs,
+    });
+
+    return scaledMs;
   }
 
   private aggregateContainerStats(stats: ContainerStats[]): ContainerStats {
@@ -152,17 +191,26 @@ export class TimeSeriesManager {
     timestamp: Date,
     newData: TimeSeriesPoint
   ) {
-    try {
-      const formattedTimestamp =
-        timestamp.toISOString().replace("T", " ") + ".000Z";
+    const formattedTimestamp = timestamp.toISOString().replace("T", " ");
 
-      // Check if a record already exists for this timestamp
+    logStorage("Attempting to store aggregated data:", {
+      collectionId,
+      timestamp: formattedTimestamp,
+      containerCount: Object.keys(newData.containers).length,
+    });
+
+    try {
       const existing = await this.pb
         .collection(collectionId)
         .getFirstListItem(`timestamp = '${formattedTimestamp}'`)
         .catch(() => null);
 
       if (existing) {
+        logStorage("Updating existing record:", {
+          collectionId,
+          recordId: existing.id,
+          oldCount: existing.metadata?.count || 1,
+        });
         // Update existing record with new running average
         const oldCount = existing.metadata?.count || 1;
         const newCount = oldCount + 1;
@@ -219,6 +267,10 @@ export class TimeSeriesManager {
           },
         });
       } else {
+        logStorage("Creating new record:", {
+          collectionId,
+          timestamp: formattedTimestamp,
+        });
         // Create new record
         await this.pb.collection(collectionId).create({
           timestamp: formattedTimestamp,
@@ -230,7 +282,11 @@ export class TimeSeriesManager {
         });
       }
     } catch (error) {
-      console.error("Full error details:", error);
+      logError("Error in storeAggregatedData:", {
+        collectionId,
+        timestamp: formattedTimestamp,
+        error,
+      });
       throw error;
     }
   }
@@ -239,102 +295,138 @@ export class TimeSeriesManager {
     sourceConfig: TimeSeriesConfig,
     config: TimeSeriesConfig
   ) {
-    // Calculate the retention window for this collection
     const now = Date.now();
-    const retentionStart = now - this.parseTimeValue(config.retention);
-    const retentionEnd = config.startFrom
-      ? now - this.parseTimeValue(config.startFrom)
-      : now;
+    const windowEnd = now - this.parseTimeValue(sourceConfig.until);
+    const windowStart = now - this.parseTimeValue(sourceConfig.retention);
 
-    // Find records in source collection that fall within this collection's window
-    const records = await this.pb.collection(sourceConfig.id).getList(1, 1000, {
-      filter: `timestamp >= '${new Date(retentionStart)
-        .toISOString()
-        .replace("T", " ")}' && timestamp < '${new Date(retentionEnd)
-        .toISOString()
-        .replace("T", " ")}'`,
-      sort: "timestamp",
+    const start = new Date(windowStart).toISOString().replace("T", " ");
+    const end = new Date(windowEnd).toISOString().replace("T", " ");
+
+    logAggregation("Aggregation window calculation:", {
+      sourceConfig: sourceConfig.id,
+      targetConfig: config.id,
+      windowStart,
+      windowEnd,
+      start,
+      end,
+      now: new Date(now).toISOString().replace("T", " "),
     });
 
-    if (records.items.length === 0) return;
-
-    // Group records by their target aggregation window
-    const resolutionMs = this.parseTimeValue(config.resolution);
-    const recordsByWindow = new Map<number, TimeSeriesPoint[]>();
-
-    records.items.forEach((record) => {
-      const recordTime = new Date(record.timestamp).getTime();
-      const windowStart = Math.floor(recordTime / resolutionMs) * resolutionMs;
-
-      if (!recordsByWindow.has(windowStart)) {
-        recordsByWindow.set(windowStart, []);
-      }
-      recordsByWindow.get(windowStart)?.push({
-        timestamp: new Date(record.timestamp),
-        containers: record.containers,
-        metadata: record.metadata,
-      });
-    });
-
-    // Aggregate and store records in target collection
-    for (const [windowStart, windowRecords] of recordsByWindow) {
-      const aggregatedData = this.aggregateData(
-        windowRecords,
-        config.resolution
-      );
-
-      try {
-        await this.storeAggregatedData(
-          config.id,
-          new Date(windowStart),
-          aggregatedData
-        );
-
-        // Delete the processed records from source collection
-        for (const record of windowRecords) {
-          if (record.id) {
-            await this.pb.collection(sourceConfig.id).delete(record.id);
-          }
-        }
-
-        console.log(
-          `Moved and aggregated ${windowRecords.length} records from ${sourceConfig.id} to ${config.id}`
-        );
-      } catch (error) {
-        console.error(`Error processing records for ${config.id}:`, error);
-      }
-    }
-
-    // After processing all records, cleanup any duplicates or out-of-window records
     try {
-      const records = await this.pb.collection(config.id).getFullList({
-        filter: `timestamp >= '${new Date(retentionStart)
-          .toISOString()
-          .replace("T", " ")}' && timestamp < '${new Date(retentionEnd)
-          .toISOString()
-          .replace("T", " ")}'`,
-        sort: "timestamp",
+      const records = await this.pb
+        .collection(sourceConfig.id)
+        .getList(1, 1000, {
+          filter: `timestamp >= '${start}' && timestamp <= '${end}'`,
+          sort: "timestamp",
+        });
+
+      logQuery("Found records:", {
+        sourceConfig: sourceConfig.id,
+        count: records.items.length,
+        timeRange: { start, end },
       });
 
-      const seenWindows = new Set<number>();
-      for (const record of records) {
+      if (records.items.length === 0) {
+        logQuery("No records to aggregate");
+        return;
+      }
+
+      // Group records by their target aggregation window
+      const resolutionMs = this.parseTimeValue(config.resolution);
+      logAggregation("Grouping records by resolution:", {
+        resolution: config.resolution,
+        resolutionMs,
+      });
+
+      const recordsByWindow = new Map<number, TimeSeriesPoint[]>();
+
+      records.items.forEach((record) => {
         const recordTime = new Date(record.timestamp).getTime();
         const windowStart =
           Math.floor(recordTime / resolutionMs) * resolutionMs;
 
-        if (seenWindows.has(windowStart)) {
-          // Delete duplicate timestamps
-          await this.pb.collection(config.id).delete(record.id);
-        } else {
-          seenWindows.add(windowStart);
+        if (!recordsByWindow.has(windowStart)) {
+          recordsByWindow.set(windowStart, []);
+        }
+        recordsByWindow.get(windowStart)?.push({
+          timestamp: new Date(record.timestamp),
+          containers: record.containers,
+          metadata: record.metadata,
+        });
+      });
+
+      // Aggregate and store records in target collection
+      for (const [bucketStart, windowRecords] of recordsByWindow) {
+        const aggregatedData = this.aggregateData(
+          windowRecords,
+          config.resolution
+        );
+
+        try {
+          await this.storeAggregatedData(
+            config.id,
+            new Date(bucketStart),
+            aggregatedData
+          );
+
+          // Delete the processed records from source collection
+          for (const record of windowRecords) {
+            if (record.id) {
+              await this.pb.collection(sourceConfig.id).delete(record.id);
+            }
+          }
+
+          logAggregation(
+            `Moved and aggregated ${windowRecords.length} records from ${sourceConfig.id} to ${config.id}`
+          );
+        } catch (error) {
+          logError(`Error processing records for ${config.id}:`, error);
         }
       }
+
+      // After processing all records, cleanup duplicates or out-of-window records
+      try {
+        const now = Date.now();
+        const retentionStart = now - this.parseTimeValue(config.retention);
+        const retentionEnd = now - this.parseTimeValue(config.startFrom || "0");
+
+        const oldRecords = await this.pb.collection(config.id).getFullList({
+          filter: `timestamp >= '${new Date(retentionStart)
+            .toISOString()
+            .replace("T", " ")}' && timestamp < '${new Date(retentionEnd)
+            .toISOString()
+            .replace("T", " ")}'`,
+          sort: "timestamp",
+        });
+
+        const seenWindows = new Set<number>();
+        for (const rec of oldRecords) {
+          const recordTime = new Date(rec.timestamp).getTime();
+          const windowStart =
+            Math.floor(recordTime / resolutionMs) * resolutionMs;
+
+          if (seenWindows.has(windowStart)) {
+            // Delete duplicate timestamps
+            await this.pb.collection(config.id).delete(rec.id);
+          } else {
+            seenWindows.add(windowStart);
+          }
+        }
+      } catch (error) {
+        logError(`Error cleaning up records for ${config.id}:`, error);
+      }
     } catch (error) {
-      console.error(`Error cleaning up records for ${config.id}:`, error);
+      logError("Error in moveAndAggregateOutdatedRecords:", {
+        sourceConfig: sourceConfig.id,
+        targetConfig: config.id,
+        error,
+      });
+      throw error;
     }
   }
 
   async aggregateStats() {
+    logAggregation("Starting aggregation cycle");
     try {
       for (const config of TIME_SERIES_CONFIGS) {
         if (config.id === "stats_realtime") continue;
@@ -345,12 +437,20 @@ export class TimeSeriesManager {
             this.parseTimeValue(config.startFrom || "0")
         );
 
-        if (!sourceConfig) continue;
+        if (!sourceConfig) {
+          logConfig("No source config found for:", config.id);
+          continue;
+        }
+
+        logAggregation("Processing config:", {
+          source: sourceConfig.id,
+          target: config.id,
+        });
 
         await this.moveAndAggregateOutdatedRecords(sourceConfig, config);
       }
     } catch (error) {
-      console.error("Error in aggregation cycle:", error);
+      logError("Error in aggregation cycle:", error);
     }
   }
 
@@ -394,7 +494,7 @@ export class TimeSeriesManager {
       const windowStart = new Date(now - untilMs);
       const windowEnd = new Date(now - startFromMs);
 
-      // Check if this resolution's window overlaps with the requested time range
+      // Check om dette intervals vindue overlapper med det ønskede timeRange
       const rangeStart = new Date(
         Math.max(timeRange.start.getTime(), windowStart.getTime())
       );

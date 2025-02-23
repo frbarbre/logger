@@ -1,6 +1,9 @@
 import cors from "cors";
 import express from "express";
-import { TimeSeriesManager } from "./lib/time-series-manager.js";
+import {
+  TimeSeriesManager,
+  TIME_SCALE_FACTOR,
+} from "./lib/time-series-manager.js";
 import superuserClient from "./pocketbase.js";
 import { ContainerStats } from "./types/index.js";
 import { formatDockerStats } from "./utils.js";
@@ -107,7 +110,8 @@ server.listen(PORT, async () => {
     process.exit(1);
   }
 
-  const interval = 10000; // Default to 10 seconds
+  const baseInterval = 10000; // 10 seconds
+  const interval = Math.round(baseInterval * TIME_SCALE_FACTOR);
 
   setInterval(async () => {
     if (isCollecting) return; // Skip if already collecting

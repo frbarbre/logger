@@ -13,6 +13,8 @@ services:
       - POCKETBASE_URL=http://pocketbase:8090
       - POCKETBASE_ADMIN_EMAIL=${POCKETBASE_ADMIN_EMAIL}
       - POCKETBASE_ADMIN_PASSWORD=${POCKETBASE_ADMIN_PASSWORD}
+      - NODE_ENV=test
+      - DEBUG=timeseries:* npm run dev
     networks:
       - app-network
     depends_on:
