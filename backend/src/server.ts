@@ -9,7 +9,6 @@ import http from "http";
 import { TIME_SCALE_FACTOR } from "./contants/index.js";
 
 const app = express();
-const server = http.createServer(app);
 
 const PORT = process.env.PORT || 8000;
 const timeSeriesManager = new TimeSeriesManager(superuserClient);
@@ -97,7 +96,7 @@ app.get("/node-api/stats/live", async (req, res) => {
 });
 
 // Start server
-server.listen(PORT, async () => {
+app.listen(PORT, async () => {
   console.log(`Server is running on port ${PORT}`);
 
   // Test connection and authenticate
