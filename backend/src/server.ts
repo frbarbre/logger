@@ -1,16 +1,15 @@
+import { exec } from "child_process";
 import cors from "cors";
 import express from "express";
+import { TIME_SCALE_FACTOR } from "./contants/index.js";
 import { TimeSeriesManager } from "./lib/time-series-manager.js";
 import superuserClient from "./pocketbase.js";
 import { ContainerStats } from "./types/index.js";
 import { formatDockerStats } from "./utils.js";
-import { exec } from "child_process";
-import http from "http";
-import { TIME_SCALE_FACTOR } from "./contants/index.js";
 
 const app = express();
 
-const PORT = process.env.PORT || 8000;
+const PORT = Number(process.env.PORT) || 8000;
 const timeSeriesManager = new TimeSeriesManager(superuserClient);
 
 app.use(express.json());
@@ -62,6 +61,11 @@ async function testPocketBaseConnection() {
 
 let isCollecting = false;
 
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
 app.get("/node-api/hello", (req, res) => {
   res.status(200).json({ message: "Hello World" });
 });
@@ -96,7 +100,7 @@ app.get("/node-api/stats/live", async (req, res) => {
 });
 
 // Start server
-app.listen(PORT, async () => {
+app.listen(PORT, "0.0.0.0", async () => {
   console.log(`Server is running on port ${PORT}`);
 
   // Test connection and authenticate
