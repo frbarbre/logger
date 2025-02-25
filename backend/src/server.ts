@@ -6,6 +6,7 @@ import { TimeSeriesManager } from "./lib/time-series-manager.js";
 import superuserClient from "./pocketbase.js";
 import { ContainerStats } from "./types/index.js";
 import { formatDockerStats } from "./utils.js";
+import { middleware } from "./middleware.js";
 
 const app = express();
 
@@ -14,6 +15,7 @@ const timeSeriesManager = new TimeSeriesManager(superuserClient);
 
 app.use(express.json());
 app.use(cors());
+app.use(middleware);
 
 const collectDockerStats = (): Promise<{
   [containerId: string]: ContainerStats;

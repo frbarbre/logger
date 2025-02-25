@@ -117,11 +117,6 @@ export function TimeRangeSelector({
           />
         </DialogContent>
       </Dialog>
-
-      <div className="mt-4">
-        <h3 className="font-semibold mb-2">Selected Range:</h3>
-        <pre className="bg-muted p-2 rounded whitespace-pre-wrap"></pre>
-      </div>
     </div>
   );
 }

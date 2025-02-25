@@ -2,7 +2,7 @@ services:
   node-logger-app:
     build: ./backend
     ports:
-      - "8000:8000"
+      - "8888:8000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:

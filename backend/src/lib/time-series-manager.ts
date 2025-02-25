@@ -1,28 +1,15 @@
-import {
-  TimeSeriesConfig,
-  TimeWindow,
-  TimeSeriesPoint,
-  ContainerStats,
-} from "../types/index.js";
 import PocketBase from "../../node_modules/pocketbase/dist/pocketbase.es.mjs";
-import { average } from "../utils.js";
-import debug from "debug";
 import { TIME_SCALE_FACTOR, TIME_SERIES_CONFIGS } from "../contants/index.js";
-
-// Create namespaced debuggers
-const logConfig = debug("timeseries:config");
-const logAggregation = debug("timeseries:aggregation");
-const logStorage = debug("timeseries:storage");
-const logQuery = debug("timeseries:query");
-const logError = debug("timeseries:error");
+import {
+  ContainerStats,
+  TimeSeriesConfig,
+  TimeSeriesPoint,
+  TimeWindow,
+} from "../types/index.js";
+import { average } from "../utils.js";
 
 export class TimeSeriesManager {
-  constructor(private pb: PocketBase) {
-    logConfig(
-      "Initializing TimeSeriesManager with TIME_SCALE_FACTOR:",
-      TIME_SCALE_FACTOR
-    );
-  }
+  constructor(private pb: PocketBase) {}
 
   private parseTimeValue(value?: string): number {
     if (!value) return 0;
@@ -43,15 +30,6 @@ export class TimeSeriesManager {
 
     // Skaler millisekunder
     const scaledMs = ms * TIME_SCALE_FACTOR;
-
-    // Log til debugging
-    logConfig("Parsed time value:", {
-      original: value,
-      numericPart,
-      unit: value.slice(-1),
-      unscaledMs: ms,
-      scaledMs,
-    });
 
     return scaledMs;
   }
@@ -109,12 +87,6 @@ export class TimeSeriesManager {
   ) {
     const formattedTimestamp = timestamp.toISOString().replace("T", " ");
 
-    logStorage("Attempting to store aggregated data:", {
-      collectionId,
-      timestamp: formattedTimestamp,
-      containerCount: Object.keys(newData.containers).length,
-    });
-
     try {
       const existing = await this.pb
         .collection(collectionId)
@@ -122,11 +94,6 @@ export class TimeSeriesManager {
         .catch(() => null);
 
       if (existing) {
-        logStorage("Updating existing record:", {
-          collectionId,
-          recordId: existing.id,
-          oldCount: existing.metadata?.count || 1,
-        });
         // Update existing record with new running average
         const oldCount = existing.metadata?.count || 1;
         const newCount = oldCount + 1;
@@ -183,10 +150,6 @@ export class TimeSeriesManager {
           },
         });
       } else {
-        logStorage("Creating new record:", {
-          collectionId,
-          timestamp: formattedTimestamp,
-        });
         // Create new record
         await this.pb.collection(collectionId).create({
           timestamp: formattedTimestamp,
@@ -198,11 +161,10 @@ export class TimeSeriesManager {
         });
       }
     } catch (error) {
-      logError("Error in storeAggregatedData:", {
-        collectionId,
-        timestamp: formattedTimestamp,
-        error,
-      });
+      console.error(
+        `Error storing aggregated data for ${collectionId}:`,
+        error
+      );
       throw error;
     }
   }
@@ -226,16 +188,6 @@ export class TimeSeriesManager {
     const startDate = new Date(windowStart).toISOString().replace("T", " ");
     const endDate = new Date(windowEnd).toISOString().replace("T", " ");
 
-    logAggregation("Aggregation window calculation:", {
-      sourceConfig: sourceConfig.id,
-      targetConfig: config.id,
-      windowStart,
-      windowEnd,
-      start: startDate,
-      end: endDate,
-      now: new Date(now).toISOString().replace("T", " "),
-    });
-
     try {
       // Find records from source that are in our aggregation window
       const sourceRecords = await this.pb
@@ -245,23 +197,8 @@ export class TimeSeriesManager {
           sort: "timestamp",
         });
 
-      logQuery("Found records:", {
-        sourceConfig: sourceConfig.id,
-        count: sourceRecords.length,
-        timeRange: { start: startDate, end: endDate },
-      });
-
-      if (sourceRecords.length === 0) {
-        logQuery("No records to aggregate");
-        return;
-      }
-
       // Group records by their target aggregation window
       const resolutionMs = this.parseTimeValue(config.resolution);
-      logAggregation("Grouping records by resolution:", {
-        resolution: config.resolution,
-        resolutionMs,
-      });
 
       const recordsByWindow = new Map<number, TimeSeriesPoint[]>();
       const recordIdsByWindow = new Map<number, string[]>(); // Track record IDs for later deletion
@@ -286,8 +223,6 @@ export class TimeSeriesManager {
         }
       });
 
-      logAggregation(`Found ${recordsByWindow.size} time windows to process`);
-
       // Aggregate and store records in target collection
       for (const [bucketStart, windowRecords] of recordsByWindow) {
         const bucketTimestamp = new Date(bucketStart);
@@ -305,11 +240,6 @@ export class TimeSeriesManager {
             aggregatedData
           );
 
-          // Delete the processed records from source collection
-          logAggregation(
-            `Deleting ${recordIds.length} processed records from ${sourceConfig.id}`
-          );
-
           // Delete in batches to avoid overwhelming the database
           const batchSize = 50;
           for (let i = 0; i < recordIds.length; i += batchSize) {
@@ -320,7 +250,7 @@ export class TimeSeriesManager {
                   .collection(sourceConfig.id)
                   .delete(id)
                   .catch((err) => {
-                    logError(
+                    console.error(
                       `Failed to delete record ${id} from ${sourceConfig.id}:`,
                       err
                     );
@@ -328,12 +258,8 @@ export class TimeSeriesManager {
               )
             );
           }
-
-          logAggregation(
-            `Moved and aggregated ${windowRecords.length} records from ${sourceConfig.id} to ${config.id}`
-          );
         } catch (error) {
-          logError(`Error processing records for ${config.id}:`, error);
+          console.error(`Error processing records for ${config.id}:`, error);
         }
       }
 
@@ -370,10 +296,6 @@ export class TimeSeriesManager {
           }
 
           if (duplicateRecords.length > 0) {
-            logStorage(
-              `Deleting ${duplicateRecords.length} duplicate records from ${config.id}`
-            );
-
             const batchSize = 50;
             for (let i = 0; i < duplicateRecords.length; i += batchSize) {
               const batch = duplicateRecords.slice(i, i + batchSize);
@@ -383,7 +305,7 @@ export class TimeSeriesManager {
                     .collection(config.id)
                     .delete(id)
                     .catch((err) => {
-                      logError(
+                      console.error(
                         `Failed to delete duplicate record ${id} from ${config.id}:`,
                         err
                       );
@@ -394,12 +316,10 @@ export class TimeSeriesManager {
           }
         }
       } catch (error) {
-        logError(`Error cleaning up records for ${config.id}:`, error);
+        console.error(`Error cleaning up records for ${config.id}:`, error);
       }
     } catch (error) {
-      logError("Error in moveAndAggregateOutdatedRecords:", {
-        sourceConfig: sourceConfig.id,
-        targetConfig: config.id,
+      console.error("Error in moveAndAggregateOutdatedRecords:", {
         error,
       });
       throw error;
@@ -407,7 +327,6 @@ export class TimeSeriesManager {
   }
 
   async aggregateStats() {
-    logAggregation("Starting aggregation cycle");
     try {
       for (const config of TIME_SERIES_CONFIGS) {
         if (config.id === "stats_realtime") continue;
@@ -419,19 +338,13 @@ export class TimeSeriesManager {
         );
 
         if (!sourceConfig) {
-          logConfig("No source config found for:", config.id);
           continue;
         }
-
-        logAggregation("Processing config:", {
-          source: sourceConfig.id,
-          target: config.id,
-        });
 
         await this.moveAndAggregateOutdatedRecords(sourceConfig, config);
       }
     } catch (error) {
-      logError("Error in aggregation cycle:", error);
+      console.error("Error in aggregation cycle:", error);
     }
   }
 

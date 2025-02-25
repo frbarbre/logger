@@ -1,4 +1,4 @@
-import PocketBase, { RecordModel } from "pocketbase";
+import PocketBase from "pocketbase";
 import { formatDate } from "./utils";
 
 export async function getContainerStatsBetweenDates(
@@ -7,34 +7,40 @@ export async function getContainerStatsBetweenDates(
   endTime: string | null
 ) {
   if (!pb.authStore.isSuperuser) {
-    return null;
+    return [];
   }
 
-  const perPage = 1000; // PocketBase max items per page
-  let allItems: RecordModel[] = [];
-  let page = 1;
+  if (!startTime || !endTime) {
+    return [];
+  }
 
-  console.log(startTime, endTime);
+  try {
+    const response = await fetch(
+      process.env.NEXT_PUBLIC_API_URL +
+        "/node-api/stats/history?" +
+        new URLSearchParams({
+          start: startTime,
+          end: endTime,
+        }),
+      {
+        headers: {
+          Authorization: `Bearer ${pb.authStore.token}`,
+        },
+      }
+    );
 
-  while (true) {
-    const records = await pb
-      .collection("stats_realtime")
-      .getList(page, perPage, {
-        sort: "-timestamp",
-        filter: `timestamp >= "${startTime}" && timestamp <= "${endTime}"`,
-      });
-
-    allItems = [...allItems, ...records.items];
-
-    // If we've received fewer items than the page size, we've reached the end
-    if (records.items.length < perPage) {
-      break;
+    if (!response.ok) {
+      console.error(response);
+      return [];
     }
 
-    page++;
-  }
+    const data = await response.json();
 
-  return allItems;
+    return data;
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
 }
 
 export const containerStatsBetweenDatesQuery = (
