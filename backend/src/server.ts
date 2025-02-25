@@ -63,12 +63,12 @@ async function testPocketBaseConnection() {
 
 let isCollecting = false;
 
-app.get("/hello", (req, res) => {
+app.get("/node-api/hello", (req, res) => {
   res.status(200).json({ message: "Hello World" });
 });
 
 // Setup routes
-app.get("/api/stats/history", async (req, res) => {
+app.get("/node-api/stats/history", async (req, res) => {
   try {
     const start = new Date(req.query.start as string);
     const end = new Date(req.query.end as string);
@@ -86,7 +86,7 @@ app.get("/api/stats/history", async (req, res) => {
   }
 });
 
-app.get("/api/stats/live", async (req, res) => {
+app.get("/node-api/stats/live", async (req, res) => {
   try {
     const stats = await collectDockerStats();
     res.json(stats);
