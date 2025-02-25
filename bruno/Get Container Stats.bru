@@ -5,7 +5,12 @@ meta {
 }
 
 get {
-  url: {{api_url}}/api/hello
+  url: {{api_url}}/api/stats/history?start=2025-02-23 16:30:00.000Z&end=2025-02-23 16:45:00.000Z
   body: none
   auth: none
+}
+
+params:query {
+  start: 2025-02-23 16:30:00.000Z
+  end: 2025-02-23 16:45:00.000Z
 }

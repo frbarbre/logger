@@ -1,14 +1,12 @@
 import cors from "cors";
 import express from "express";
-import {
-  TimeSeriesManager,
-  TIME_SCALE_FACTOR,
-} from "./lib/time-series-manager.js";
+import { TimeSeriesManager } from "./lib/time-series-manager.js";
 import superuserClient from "./pocketbase.js";
 import { ContainerStats } from "./types/index.js";
 import { formatDockerStats } from "./utils.js";
 import { exec } from "child_process";
 import http from "http";
+import { TIME_SCALE_FACTOR } from "./contants/index.js";
 
 const app = express();
 const server = http.createServer(app);
