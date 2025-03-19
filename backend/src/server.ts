@@ -10,6 +10,7 @@ import { formatDockerStats } from "./utils.js";
 import { middleware } from "./middleware.js";
 import WebSocket, { WebSocketServer } from "ws";
 import { spawn } from "child_process";
+import PocketBase from "../node_modules/pocketbase/dist/pocketbase.es.mjs";
 
 const app = express();
 
@@ -18,7 +19,7 @@ const timeSeriesManager = new TimeSeriesManager(superuserClient);
 
 app.use(express.json());
 app.use(cors());
-// app.use(middleware);
+app.use(middleware);
 
 const collectDockerStats = (): Promise<{
   [containerId: string]: ContainerStats;
@@ -132,6 +133,19 @@ wss.on("connection", (ws: WebSocket, req: any) => {
   // Parse the URL and query parameters
   const url = new URL(req.url || "", `http://${req.headers.host}`);
   const containerId = url.searchParams.get("containerId");
+  const token = url.searchParams.get("token");
+
+  const pb = new PocketBase(process.env.POCKETBASE_URL);
+
+  pb.authStore.save(token?.replace("Bearer ", "") || "");
+
+  if (!pb.authStore.isSuperuser) {
+    ws.send(
+      JSON.stringify({ error: "Unauthorized, please use a superuser token" })
+    );
+    ws.close();
+    return;
+  }
 
   if (!containerId) {
     ws.send(JSON.stringify({ error: "Container ID is required" }));
