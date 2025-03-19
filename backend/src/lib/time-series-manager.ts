@@ -413,7 +413,6 @@ export class TimeSeriesManager {
       const start = range.start.toISOString().replace("T", " ");
       const end = range.end.toISOString().replace("T", " ");
 
-      console.log(start, end);
       return this.pb.collection(range.collection).getList(1, 1000, {
         sort: "-timestamp",
         filter: `timestamp >= "${start}" && timestamp <= "${end}"`,

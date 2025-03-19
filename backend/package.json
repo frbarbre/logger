@@ -18,7 +18,7 @@
     "lodash": "^4.17.21",
     "pocketbase": "^0.25.1",
     "typescript": "^5.2.2",
-    "ws": "^8.12.0"
+    "ws": "^8.18.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

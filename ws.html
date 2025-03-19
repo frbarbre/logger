@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Container Logs WebSocket Test</title>
+    <style>
+      #log {
+        width: 100%;
+        height: 500px;
+        overflow-y: scroll;
+        border: 1px solid #ccc;
+        font-family: monospace;
+        padding: 10px;
+        white-space: pre-wrap;
+      }
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Container Logs WebSocket Test</h1>
+    <div>
+      <label for="container">Container ID:</label>
+      <input type="text" id="container" value="logger-node-app-1" />
+      <button onclick="connect()">Connect</button>
+      <button onclick="disconnect()">Disconnect</button>
+    </div>
+    <div id="status">Disconnected</div>
+    <h3>Logs:</h3>
+    <div id="log"></div>
+
+    <script>
+      let ws;
+      const logElement = document.getElementById("log");
+      const statusElement = document.getElementById("status");
+
+      function connect() {
+        const containerId = document.getElementById("container").value;
+
+        if (!containerId) {
+          alert("Please enter a container ID");
+          return;
+        }
+
+        disconnect();
+
+        statusElement.textContent = `Connecting to ${containerId}...`;
+        ws = new WebSocket(`ws://localhost:8000?containerId=${containerId}`);
+
+        console.log("ws", ws);
+
+        ws.onopen = () => {
+          statusElement.textContent = `Connected to ${containerId}`;
+          appendLog("Connected to WebSocket server", "green");
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.error) {
+              appendLog(`ERROR: ${data.error}`, "red");
+            } else {
+              appendLog(JSON.stringify(data, null, 2));
+            }
+          } catch (e) {
+            // Not JSON, treat as plain text
+            appendLog(event.data);
+          }
+        };
+
+        ws.onerror = (error) => {
+          statusElement.textContent = "Error";
+          appendLog(`WebSocket error: ${error}`, "red");
+        };
+
+        ws.onclose = () => {
+          statusElement.textContent = "Disconnected";
+          appendLog("Connection closed", "orange");
+        };
+      }
+
+      function disconnect() {
+        if (ws) {
+          ws.close();
+          ws = null;
+        }
+      }
+
+      function appendLog(message, color = "black") {
+        const line = document.createElement("div");
+        line.style.color = color;
+        line.textContent = message;
+        logElement.appendChild(line);
+        logElement.scrollTop = logElement.scrollHeight;
+      }
+    </script>
+  </body>
+</html>
