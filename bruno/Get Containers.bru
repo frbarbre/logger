@@ -1,0 +1,15 @@
+meta {
+  name: Get Container Stats
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{api_url}}/node-api/containers
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJwYmNfMzE0MjYzNTgyMyIsImV4cCI6MTc0MDE3MTk3MSwiaWQiOiIyOWVtNzFucDVqNWVxN3QiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.cWRoBfIItrXJlHUPL87Az6szZN4mPMGBOIkg0zr-XJU
+}

@@ -1,16 +1,18 @@
-import { exec } from "child_process";
+import { spawn } from "child_process";
 import cors from "cors";
 import express from "express";
 import { createServer } from "http";
+import WebSocket, { WebSocketServer } from "ws";
+import PocketBase from "../node_modules/pocketbase/dist/pocketbase.es.mjs";
 import { TIME_SCALE_FACTOR } from "./contants/index.js";
 import { TimeSeriesManager } from "./lib/time-series-manager.js";
-import superuserClient from "./pocketbase.js";
-import { ContainerStats } from "./types/index.js";
-import { formatDockerStats } from "./utils.js";
+import {
+  collectDockerStats,
+  getContainerLogs,
+  getContainers,
+} from "./loggers.js";
 import { middleware } from "./middleware.js";
-import WebSocket, { WebSocketServer } from "ws";
-import { spawn } from "child_process";
-import PocketBase from "../node_modules/pocketbase/dist/pocketbase.es.mjs";
+import superuserClient from "./pocketbase.js";
 
 const app = express();
 
@@ -20,56 +22,6 @@ const timeSeriesManager = new TimeSeriesManager(superuserClient);
 app.use(express.json());
 app.use(cors());
 app.use(middleware);
-
-const collectDockerStats = (): Promise<{
-  [containerId: string]: ContainerStats;
-}> => {
-  return new Promise((resolve) => {
-    exec(
-      "docker stats --no-stream --format '{{json .}}'",
-      async (err, stdout, stderr) => {
-        if (err || stderr) {
-          console.error(err || stderr);
-          resolve({});
-          return;
-        }
-
-        const containerStats = stdout
-          .trim()
-          .split("\n")
-          .map((line) => JSON.parse(line))
-          .map((stat) => {
-            const formatted = formatDockerStats(stat);
-            return [formatted.name, formatted] as const;
-          })
-          .reduce<{ [key: string]: ContainerStats }>((acc, [name, stats]) => {
-            acc[name] = stats;
-            return acc;
-          }, {});
-
-        resolve(containerStats);
-      }
-    );
-  });
-};
-
-const getContainerLogs = (containerId: string): Promise<string[]> => {
-  return new Promise((resolve) => {
-    exec(
-      `docker logs ${containerId} --timestamps`,
-      async (err, stdout, stderr) => {
-        if (err || stderr) {
-          console.error(err || stderr);
-          resolve([]);
-          return;
-        }
-
-        const logs = stdout.trim().split("\n");
-        resolve(logs);
-      }
-    );
-  });
-};
 
 // Function to test PocketBase connection
 async function testPocketBaseConnection() {
@@ -82,12 +34,6 @@ async function testPocketBaseConnection() {
     return false;
   }
 }
-
-let isCollecting = false;
-
-app.get("/node-api/hello", (req, res) => {
-  res.status(200).json({ message: "Hello World" });
-});
 
 // Setup routes
 app.get("/node-api/stats/history", async (req, res) => {
@@ -118,8 +64,19 @@ app.get("/node-api/stats/live", async (req, res) => {
   }
 });
 
+app.get("/node-api/containers", async (req, res) => {
+  try {
+    const containers = await getContainers();
+    res.json(containers);
+  } catch (error) {
+    console.error("Error fetching containers:", error);
+    res.status(500).json({ error: "Failed to fetch containers" });
+  }
+});
+
 // Create HTTP server separately to attach both Express and WebSockets
 const server = createServer(app);
+
 const wss = new WebSocketServer({
   server,
   path: "/node-api/ws", // Match the path used in the frontend
@@ -203,6 +160,8 @@ app.get("/node-api/container-logs/:containerId", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch container logs" });
   }
 });
+
+let isCollecting = false;
 
 // Start server
 server.listen(PORT, "0.0.0.0", async () => {

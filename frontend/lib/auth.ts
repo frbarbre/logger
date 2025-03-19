@@ -1,5 +1,4 @@
 import { Session } from "@/types";
-import client from "@/utils/pb.server";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 

@@ -1,6 +1,13 @@
 "use client";
 
-import { Session } from "@/types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Container, Session } from "@/types";
 import { useEffect, useState, useRef } from "react";
 
 // Define a type for log entries
@@ -9,9 +16,17 @@ type LogEntry = {
   color: string;
 };
 
-export default function WS({ session }: { session: Session }) {
+export default function WS({
+  session,
+  containers,
+}: {
+  session: Session;
+  containers: Container[] | null;
+}) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [containerId, setContainerId] = useState<string>("logger-node-app-1");
+  const [containerId, setContainerId] = useState<string>(
+    containers?.[0]?.Names || ""
+  );
   const [status, setStatus] = useState<string>("Disconnected");
   const logContainerRef = useRef<HTMLDivElement>(null);
   const [ws, setWs] = useState<WebSocket | null>(null);
@@ -69,13 +84,6 @@ export default function WS({ session }: { session: Session }) {
     };
   };
 
-  const disconnect = () => {
-    if (ws) {
-      ws.close();
-      setWs(null);
-    }
-  };
-
   const appendLog = (message: string, color = "black") => {
     setLogs((prevLogs) => [...prevLogs, { message, color }]);
 
@@ -88,40 +96,27 @@ export default function WS({ session }: { session: Session }) {
     }, 0);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const formData = new FormData(e.target as HTMLFormElement);
-    const newContainerId = formData.get("containerId") as string;
-    setContainerId(newContainerId);
-  };
-
   return (
     <div className="p-5 font-sans">
       <h1 className="text-2xl font-bold mb-4">Container Logs WebSocket Test</h1>
       <div className="mb-4">
-        <form onSubmit={handleSubmit} className="flex gap-2 items-center mb-2">
-          <label htmlFor="containerId">Container ID:</label>
-          <input
-            type="text"
-            id="containerId"
-            name="containerId"
-            defaultValue={containerId}
-            className="border border-gray-300 rounded px-2 py-1"
-          />
-          <button
-            type="submit"
-            className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-          >
-            Connect
-          </button>
-          <button
-            type="button"
-            onClick={disconnect}
-            className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
-          >
-            Disconnect
-          </button>
-        </form>
+        <Select
+          value={containerId}
+          onValueChange={(v) => {
+            setContainerId(v);
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select a container" />
+          </SelectTrigger>
+          <SelectContent>
+            {containers?.map((container) => (
+              <SelectItem key={container.ID} value={container.Names}>
+                {container.Names}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <div id="status" className="font-semibold">
           {status}
         </div>
