@@ -1,8 +1,8 @@
 # Use Node.js 22 as the base image
 FROM node:22-alpine
 
-# Install Docker CLI
-RUN apk add --no-cache docker-cli
+# Install Docker CLI and curl
+RUN apk add --no-cache docker-cli curl
 
 # Create app directory
 WORKDIR /usr/src/app

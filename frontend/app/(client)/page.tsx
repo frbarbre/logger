@@ -7,7 +7,7 @@ import client from "@/utils/pb.server";
 import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import StatsDisplay from "../components/stats-display";
+import StatsDisplay from "../../components/stats-display";
 import { Session } from "@/types";
 
 type Props = {

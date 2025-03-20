@@ -5,16 +5,16 @@ meta {
 }
 
 get {
-  url: {{api_url}}/node-api/stats/history?start=2025-02-25 17:30:00.000Z&end=2025-02-25 19:00:00.000Z
+  url: {{api_url}}/node-api/stats/history?start=2025-03-18 17:30:00.000Z&end=2025-03-19 23:30:00.000Z
   body: none
   auth: bearer
 }
 
 params:query {
-  start: 2025-02-25 17:30:00.000Z
-  end: 2025-02-25 19:00:00.000Z
+  start: 2025-03-18 17:30:00.000Z
+  end: 2025-03-19 23:30:00.000Z
 }
 
 auth:bearer {
-  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJwYmNfMzE0MjYzNTgyMyIsImV4cCI6MTc0MDE3MTk3MSwiaWQiOiIyOWVtNzFucDVqNWVxN3QiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.cWRoBfIItrXJlHUPL87Az6szZN4mPMGBOIkg0zr-XJU
+  token: {{auth_token}}
 }

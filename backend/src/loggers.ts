@@ -54,7 +54,7 @@ export async function getContainerLogs(containerId: string): Promise<string[]> {
 
 export async function getContainers(): Promise<string[]> {
   return new Promise((resolve) => {
-    exec(`docker ps --format '{{json .}}'`, async (err, stdout, stderr) => {
+    exec(`docker ps -a --format '{{json .}}'`, async (err, stdout, stderr) => {
       if (err || stderr) {
         console.error(err || stderr);
         resolve([]);
@@ -70,6 +70,20 @@ export async function getContainers(): Promise<string[]> {
         });
 
       resolve(containers);
+    });
+  });
+}
+
+export async function getIpAddress(): Promise<string> {
+  return new Promise((resolve) => {
+    exec("curl -s ipinfo.io/ip", (err, stdout, stderr) => {
+      if (err || stderr) {
+        console.error(err || stderr);
+        resolve("");
+        return;
+      }
+
+      resolve(stdout.trim());
     });
   });
 }

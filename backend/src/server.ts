@@ -10,6 +10,7 @@ import {
   collectDockerStats,
   getContainerLogs,
   getContainers,
+  getIpAddress,
 } from "./loggers.js";
 import { middleware } from "./middleware.js";
 import superuserClient from "./pocketbase.js";
@@ -71,6 +72,16 @@ app.get("/node-api/containers", async (req, res) => {
   } catch (error) {
     console.error("Error fetching containers:", error);
     res.status(500).json({ error: "Failed to fetch containers" });
+  }
+});
+
+app.get("/node-api/ip", async (req, res) => {
+  try {
+    const ip = await getIpAddress();
+    res.json({ ip });
+  } catch (error) {
+    console.error("Error fetching IP address:", error);
+    res.status(500).json({ error: "Failed to fetch IP address" });
   }
 });
 
