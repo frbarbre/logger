@@ -29,6 +29,8 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import Link from "next/link";
+import Image from "next/image";
+import { Session } from "@/types";
 
 // This is sample data.
 const data = {
@@ -160,7 +162,14 @@ const data = {
   ],
 };
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({
+  ip,
+  user,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & {
+  ip?: string;
+  user?: Session["user"] | null;
+}) {
   return (
     <Sidebar collapsible="icon" variant="inset" {...props}>
       <SidebarHeader>
@@ -168,12 +177,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <Command className="size-4" />
-                </div>
+                <Image
+                  src="/docker.svg"
+                  alt="Docker Logo"
+                  width={32}
+                  height={32}
+                  className="rounded-md border"
+                />
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Locker</span>
-                  <span className="truncate text-xs">49.123.123.123</span>
+                  <span className="truncate font-semibold">Logger</span>
+                  <span className="truncate text-xs">by Frederik Barbré</span>
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -184,9 +197,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={data.navMain} />
         <NavProjects projects={data.projects} />
       </SidebarContent>
-      <SidebarFooter>
-        <NavUser user={data.user} />
-      </SidebarFooter>
+      <SidebarFooter>{user && <NavUser user={user} ip={ip} />}</SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

@@ -1,8 +1,7 @@
+import Providers from "@/components/providers";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "../globals.css";
-import Providers from "@/components/providers";
-import Header from "@/components/header";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -19,6 +18,8 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { getServerIpAddress } from "@/actions/logger.actions";
+import { getSession } from "@/lib/auth";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,11 +36,14 @@ export const metadata: Metadata = {
   description: "Dashboard for Logger",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const ip = await getServerIpAddress();
+  const session = await getSession();
+
   return (
     <html lang="en">
       <body
@@ -47,7 +51,7 @@ export default function RootLayout({
       >
         <Providers>
           <SidebarProvider>
-            <AppSidebar />
+            <AppSidebar ip={ip?.ip} user={session?.user} />
             <SidebarInset>
               <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
                 <div className="flex items-center gap-2 px-4">

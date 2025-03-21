@@ -1,7 +1,7 @@
 "use server";
 
 import { formSchema } from "@/components/login-form";
-import { login } from "@/lib/auth";
+import { login, logout } from "@/lib/auth";
 import client from "@/utils/pb.server";
 import { z } from "zod";
 
@@ -21,4 +21,8 @@ export async function signIn(values: z.infer<typeof formSchema>) {
     console.error(error);
     return error;
   }
+}
+
+export async function signOut() {
+  await logout();
 }

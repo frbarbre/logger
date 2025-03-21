@@ -28,13 +28,16 @@ dayjs.extend(utc);
 dayjs.extend(relativeTime);
 
 const predefinedRanges = [
-  { label: "Last 72 hours", value: "72h" },
-  { label: "Last 48 hours", value: "48h" },
-  { label: "Last 24 hours", value: "24h" },
-  { label: "Last 12 hours", value: "12h" },
-  { label: "Last 6 hours", value: "6h" },
-  { label: "Last hour", value: "1h" },
   { label: "Last 30 minutes", value: "30m" },
+  { label: "Last hour", value: "1h" },
+  { label: "Last 6 hours", value: "6h" },
+  { label: "Last 12 hours", value: "12h" },
+  { label: "Last 24 hours", value: "24h" },
+  { label: "Last 48 hours", value: "48h" },
+  { label: "Last 72 hours", value: "72h" },
+  { label: "Last 7 days", value: "168h" },
+  { label: "Last 14 days", value: "336h" },
+  { label: "Last 30 days", value: "720h" },
 ];
 
 interface TimeRangeSelectorProps {
