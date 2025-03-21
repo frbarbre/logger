@@ -4,7 +4,6 @@ import express from "express";
 import { createServer } from "http";
 import WebSocket, { WebSocketServer } from "ws";
 import PocketBase from "../node_modules/pocketbase/dist/pocketbase.es.mjs";
-import { TIME_SCALE_FACTOR } from "./contants/index.js";
 import { TimeSeriesManager } from "./lib/time-series-manager.js";
 import {
   collectDockerStats,
@@ -186,8 +185,7 @@ server.listen(PORT, "0.0.0.0", async () => {
     process.exit(1);
   }
 
-  const baseInterval = 10000; // 10 seconds
-  const interval = Math.round(baseInterval * TIME_SCALE_FACTOR);
+  const interval = 10000; // 10 seconds
 
   setInterval(async () => {
     if (isCollecting) return; // Skip if already collecting

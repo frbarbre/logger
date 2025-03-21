@@ -1,5 +1,5 @@
 import PocketBase from "../../node_modules/pocketbase/dist/pocketbase.es.mjs";
-import { TIME_SCALE_FACTOR, TIME_SERIES_CONFIGS } from "../contants/index.js";
+import { TIME_SERIES_CONFIGS } from "../contants/index.js";
 import {
   ContainerStats,
   TimeSeriesConfig,
@@ -28,10 +28,7 @@ export class TimeSeriesManager {
       ms = numericPart * 24 * 60 * 60 * 1000;
     }
 
-    // Skaler millisekunder
-    const scaledMs = ms * TIME_SCALE_FACTOR;
-
-    return scaledMs;
+    return ms;
   }
 
   private aggregateContainerStats(stats: ContainerStats[]): ContainerStats {
